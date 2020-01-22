@@ -4,7 +4,10 @@ get_nsw <- function(prevalent = 2) {
   covariates_raster <- stack(vars)
   crs(covariates_raster) <- CRS("+init=epsg:4283")
   
-  window <- maptools::as.im.RasterLayer(covariates_raster[[1]])
+  covariates <- lapply(as.list(covariates_raster), 
+                       function(element) maptools::as.im.RasterLayer(element))
+  
+  window <- covariates[[1]]
   
   load("../data/moddat.RData")
   species <- list(angobake = angobake_moddat, 
@@ -52,5 +55,5 @@ get_nsw <- function(prevalent = 2) {
   sp_keep <- names(sp_prevalence)[1:prevalent]
   all_species <- all_species[all_species$sp %in% sp_keep, ]
   
-  list(configuration = Configuration(all_species$long, all_species$lat, factor(all_species$sp)), window = window)
+  list(configuration = Configuration(all_species$long, all_species$lat, factor(all_species$sp)), window = window, covariates = covariates)
 }
