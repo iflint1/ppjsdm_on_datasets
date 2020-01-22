@@ -1,0 +1,51 @@
+---
+title: "Fithian et al. (2014) NSW"
+output: pdf_document
+vignette: >
+  %\VignetteIndexEntry{nsw}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  
+```{r, include = FALSE}
+is_check <- ("CheckExEnv" %in% search()) || any(c("_R_CHECK_TIMINGS_",
+                                                  "_R_CHECK_LICENSE_") %in% names(Sys.getenv()))
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = !is_check,
+  purl = !is_check
+)
+
+```
+
+```{r setup}
+library(maptools)
+library(ppjsdm)
+library(raster)
+library(sf)
+library(spatstat)
+remove(list = ls())
+
+source("../R/get_nsw.R")
+
+set.seed(1)
+```
+
+This vignette explains how to use the `ppjsdm` package with the NSW dataset from Fithian et al. (2014).
+We begin by loading the data with only the most prevalent species.
+
+```{r}
+number_of_species <- 4 # Includes the most prevalent species from the plot
+
+nsw <- get_nsw(prevalent = number_of_species)
+configuration <- nsw$configuration
+window <- nsw$window
+```
+
+The point configuration is plotted below.
+
+```{r, fig.height = 4, fig.align = 'center', fig}
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(configuration, window = window)
+```
