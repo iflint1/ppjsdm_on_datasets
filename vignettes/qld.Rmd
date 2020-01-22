@@ -29,16 +29,88 @@ source("../R/get_qld.R")
 set.seed(1)
 ```
 
-We begin by loading the data with the two most prevalent species.
+This vignette explains how to use the `ppjsdm` package with the Queensland rainforest dataset from CSIRO.
+We begin by loading the data with the most prevalent species.
 
 ```{r}
-qld <- get_qld(prevalent = 2)
+index_of_plot <- 3 # Between 1 and 20
+year <- 2011 # Year of census
+number_of_species <- 2 # Includes the most prevalent species from the plot
+
+qld <- get_qld(index = index_of_plot,
+               year = year, 
+               prevalent = number_of_species)
 configuration <- qld$configuration
 window <- qld$window
 ```
 
+The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
+```
+
+The function `gibbsm` fits a multivariate Gibbs point process to our dataset.
+For example,
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window)
+```
+
+By default, the function fits the model that was introduced in the ARC grant [TODO: Add reference].
+This model has many drawbacks, the most important of which is that the model with the fitted values is degenerate, as can be seen by drawing from the model.
+
+```{r}
+lambda <- exp(fit$coefficients[1:number_of_species])
+alpha <- matrix(c(fit$coefficients[3], 
+                  fit$coefficients[4], 
+                  fit$coefficients[4], 
+                  fit$coefficients[5]), ncol = number_of_species, nrow = number_of_species)
+draw <- ppjsdm::rmultigibbs(window = window, 
+                            alpha = alpha, 
+                            lambda = lambda, 
+                            types = levels(types(configuration)),
+                            steps = 1000000)
+```
+
+```{r}
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(draw, window = window)
+```
+
+The Geyer model is better suited to most situations, but the user needs to specify some additional parameters before the fitting may take place.
+
+```{r}
+radii <- matrix(5, number_of_species, number_of_species)
+```
+
+The matrix `radii` models interaction radii within a species, and between species.
+An interaction radius of $5$ gives good results in the fitting procedure.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, model = "Geyer", radius = radii)
+summary(fit)
+```
+
+Note that in this case the model is not degenerate; indeed we can sample from it as follows.
+
+```{r}
+lambda <- exp(fit$coefficients[1:number_of_species])
+alpha <- matrix(c(fit$coefficients[3], 
+                  fit$coefficients[4], 
+                  fit$coefficients[4], 
+                  fit$coefficients[5]), ncol = number_of_species, nrow = number_of_species)
+draw <- ppjsdm::rmultigibbs(window = window, 
+                            alpha = alpha, 
+                            lambda = lambda,
+                            model = "Geyer", 
+                            radius = radii,
+                            types = levels(types(configuration)),
+                            steps = 1000000)
+```
+
+```{r}
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(draw, window = window)
 ```
