@@ -1,0 +1,44 @@
+---
+title: "Queensland rainforest"
+output: pdf_document
+vignette: >
+  %\VignetteIndexEntry{qld}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  
+```{r, include = FALSE}
+is_check <- ("CheckExEnv" %in% search()) || any(c("_R_CHECK_TIMINGS_",
+                                                  "_R_CHECK_LICENSE_") %in% names(Sys.getenv()))
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = !is_check,
+  purl = !is_check
+)
+
+```
+
+```{r setup}
+library(ppjsdm)
+library(spatstat)
+remove(list = ls())
+
+source("../R/get_qld.R")
+
+set.seed(1)
+```
+
+We begin by loading the data with the two most prevalent species.
+
+```{r}
+qld <- get_qld(prevalent = 2)
+configuration <- qld$configuration
+window <- qld$window
+```
+
+
+```{r, fig.height = 4, fig.align = 'center', fig}
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(configuration, window = window)
+```
