@@ -1,14 +1,13 @@
 get_bci <- function(prevalent = 2, jitter = .1) {
   load("../data/bci.tree8.rdata")
   raw_data <- bci.tree8
+  
+  raw_data <- raw_data[!is.na(raw_data$gx) & !is.na(raw_data$gy), ]
+  raw_data <- raw_data[raw_data$status == "A", ]
 
   sp_prevalence <- rev(sort(table(raw_data$sp)))
   sp_keep <- names(sp_prevalence)[1:prevalent]
   raw_data <- raw_data[raw_data$sp %in% sp_keep, ]
-
-  raw_data <- raw_data[!is.na(raw_data$gx) & !is.na(raw_data$gy), ]
-
-  raw_data <- raw_data[raw_data$status == "A", ]
 
   number_locations <- length(raw_data$gx)
   jiggle <- rnorm(2 * number_locations, 0, jitter)
