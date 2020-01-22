@@ -1,6 +1,6 @@
 get_qld <- function(index = 15, year = 2013, prevalent = 10, jitter = 0.3) {
   stopifnot(index >= 1, index <= 20, year >= 1971, year <= 2013)
-  raw_qld_trees <- ppjsdm::raw_qld_trees
+  load("../data/raw_qld_trees.rda")
 
   index_epNumber <- unique(raw_qld_trees$epNumber)[index]
   message("The chosen index corresponds to ", paste(index_epNumber, collapse = ", "), ".")
