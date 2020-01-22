@@ -60,6 +60,10 @@ radii <- matrix(0.1, number_of_species, number_of_species)
 Fitting the model to the dataset is then quite easy.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, covariates = covariates, model = "Geyer", radius = radii)
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      covariates = covariates, 
+                      model = "Geyer", 
+                      radius = radii)
 summary(fit)
 ```

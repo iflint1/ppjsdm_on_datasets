@@ -50,7 +50,8 @@ The BCI dataset also contains a series of environmental covariates.
 The easiest to obtain are the elevation level and the elevation gradient, since they are included in `spatstat`.
 
 ```{r}
-covariates <- list(elevation = spatstat.data::bei.extra$elev, gradient = spatstat.data::bei.extra$grad)
+covariates <- list(elevation = spatstat.data::bei.extra$elev, 
+                   gradient = spatstat.data::bei.extra$grad)
 ```
 
 Plotting covariates maps is easy in `spatstat`.
@@ -70,6 +71,10 @@ radii <- matrix(3, number_of_species, number_of_species)
 Fitting the model to the dataset is then quite easy.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, covariates = covariates, model = "Geyer", radius = radii)
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      covariates = covariates, 
+                      model = "Geyer", 
+                      radius = radii)
 summary(fit)
 ```
