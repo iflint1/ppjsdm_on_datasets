@@ -69,11 +69,11 @@ alpha <- matrix(c(fit$coefficients[3],
                   fit$coefficients[5]), 
                 ncol = number_of_species, 
                 nrow = number_of_species)
-draw <- ppjsdm::rmultigibbs(window = window, 
-                            alpha = alpha, 
-                            lambda = lambda, 
-                            types = levels(types(configuration)),
-                            steps = 1000000)
+draw <- ppjsdm::rgibbs(window = window, 
+                       alpha = alpha, 
+                       lambda = lambda, 
+                       types = levels(types(configuration)),
+                       steps = 1000000)
 ```
 
 ```{r}
@@ -105,13 +105,13 @@ alpha <- matrix(c(fit$coefficients[3],
                   fit$coefficients[5]), 
                 ncol = number_of_species, 
                 nrow = number_of_species)
-draw <- ppjsdm::rmultigibbs(window = window, 
-                            alpha = alpha, 
-                            lambda = lambda,
-                            model = "Geyer", 
-                            radius = radii,
-                            types = levels(types(configuration)),
-                            steps = 1000000)
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = alpha, 
+                       lambda = lambda,
+                       model = "Geyer", 
+                       radius = radii,
+                       types = levels(types(configuration)),
+                       steps = 1000000)
 ```
 
 ```{r}
