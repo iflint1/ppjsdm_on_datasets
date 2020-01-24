@@ -97,7 +97,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       model = "Geyer", 
                       radius = radii,
                       use_glmnet = FALSE)
-print(fit)
+summary(fit)
 ```
 
 Note that in this case the model is not degenerate; indeed we can sample from it as follows.
