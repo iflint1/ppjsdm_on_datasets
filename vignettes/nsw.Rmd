@@ -64,6 +64,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       window = window, 
                       covariates = covariates, 
                       model = "Geyer", 
-                      radius = radii)
+                      radius = radii,
+                      use_glmnet = FALSE)
 summary(fit)
 ```

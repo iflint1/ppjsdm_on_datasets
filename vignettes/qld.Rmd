@@ -55,7 +55,8 @@ The function `gibbsm` fits a multivariate Gibbs point process to our dataset.
 For example,
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window)
+fit <- ppjsdm::gibbsm(configuration, window = window, use_glmnet = FALSE)
+summary(fit)
 ```
 
 By default, the function fits the model that was introduced in the ARC grant [TODO: Add reference].
@@ -91,8 +92,12 @@ The matrix `radii` models interaction radii within a species, and between specie
 An interaction radius of $5$ gives good results in the fitting procedure.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, model = "Geyer", radius = radii)
-summary(fit)
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = "Geyer", 
+                      radius = radii,
+                      use_glmnet = FALSE)
+print(fit)
 ```
 
 Note that in this case the model is not degenerate; indeed we can sample from it as follows.
