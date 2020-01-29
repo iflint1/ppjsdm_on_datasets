@@ -1,0 +1,64 @@
+---
+title: "Lansing dataset"
+output: pdf_document
+vignette: >
+  %\VignetteIndexEntry{lansing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+  
+```{r, include = FALSE}
+is_check <- ("CheckExEnv" %in% search()) || any(c("_R_CHECK_TIMINGS_",
+                                                  "_R_CHECK_LICENSE_") %in% names(Sys.getenv()))
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = !is_check,
+  purl = !is_check
+)
+
+```
+
+```{r setup}
+library(ppjsdm)
+library(spatstat)
+remove(list = ls())
+
+set.seed(1)
+```
+
+This vignette explains how to use the `ppjsdm` package with the Lansing dataset from `spatstat`.
+We begin by loading the data with all species.
+
+```{r}
+data(lansing)
+configuration <- as.Configuration(lansing)
+window <- Rectangle_window(c(0, 1), c(0, 1))
+```
+
+The point configuration is plotted below.
+
+```{r, fig.height = 4, fig.align = 'center', fig}
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(configuration, window = window)
+```
+
+We fit the data with the Geyer model.
+
+```{r}
+radii <- matrix(0.05, 6, 6)
+```
+
+The matrix `radii` models interaction radii within a species, and between species.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = "Geyer", 
+                      radius = radii,
+                      use_glmnet = TRUE)
+plot(fit$complete)
+plot(fit$cv)
+print(coefficients(fit$complete))
+```
+
