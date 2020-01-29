@@ -76,6 +76,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       covariates = covariates, 
                       model = "Geyer", 
                       radius = radii,
-                      use_glmnet = FALSE)
-summary(fit)
+                      use_glmnet = TRUE)
+plot(fit$complete)
+plot(fit$cv)
 ```

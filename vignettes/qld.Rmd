@@ -55,19 +55,22 @@ The function `gibbsm` fits a multivariate Gibbs point process to our dataset.
 For example,
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, use_glmnet = FALSE)
-summary(fit)
+fit <- ppjsdm::gibbsm(configuration, window = window, use_glmnet = TRUE)
+fit <- fit$complete
+plot(fit)
 ```
 
 By default, the function fits the model that was introduced in the ARC grant [TODO: Add reference].
 This model has many drawbacks, the most important of which is that the model with the fitted values is degenerate, as can be seen by drawing from the model.
 
 ```{r}
-lambda <- exp(fit$coefficients[1:number_of_species])
-alpha <- matrix(c(fit$coefficients[3], 
-                  fit$coefficients[4], 
-                  fit$coefficients[4], 
-                  fit$coefficients[5]), 
+coefs <- coefficients(fit, s = 0)[-1]
+print(coefs)
+lambda <- exp(coefs[1:2])
+alpha <- matrix(c(coefs[3], 
+                  coefs[4], 
+                  coefs[4], 
+                  coefs[5]), 
                 ncol = number_of_species, 
                 nrow = number_of_species)
 draw <- ppjsdm::rgibbs(window = window, 
@@ -96,18 +99,21 @@ fit <- ppjsdm::gibbsm(configuration,
                       window = window, 
                       model = "Geyer", 
                       radius = radii,
-                      use_glmnet = FALSE)
-summary(fit)
+                      use_glmnet = TRUE)
+fit <- fit$complete
+plot(fit)
 ```
 
 Note that in this case the model is not degenerate; indeed we can sample from it as follows.
 
 ```{r}
-lambda <- exp(fit$coefficients[1:number_of_species])
-alpha <- matrix(c(fit$coefficients[3], 
-                  fit$coefficients[4], 
-                  fit$coefficients[4], 
-                  fit$coefficients[5]), 
+coefs <- coefficients(fit, s = 0)[-1]
+print(coefs)
+lambda <- exp(coefs[1:2])
+alpha <- matrix(c(coefs[3], 
+                  coefs[4], 
+                  coefs[4], 
+                  coefs[5]), 
                 ncol = number_of_species, 
                 nrow = number_of_species)
 draw <- ppjsdm::rgibbs(window = window,
@@ -115,8 +121,7 @@ draw <- ppjsdm::rgibbs(window = window,
                        lambda = lambda,
                        model = "Geyer", 
                        radius = radii,
-                       types = levels(types(configuration)),
-                       steps = 1000000)
+                       types = levels(types(configuration)))
 ```
 
 ```{r}
