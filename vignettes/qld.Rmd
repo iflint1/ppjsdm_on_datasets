@@ -56,16 +56,14 @@ For example,
 
 ```{r}
 fit <- ppjsdm::gibbsm(configuration, window = window, use_glmnet = TRUE)
-fit <- fit$complete
-plot(fit)
+plot(fit$complete)
 ```
 
 By default, the function fits the model that was introduced in the ARC grant [TODO: Add reference].
 This model has many drawbacks, the most important of which is that the model with the fitted values is degenerate, as can be seen by drawing from the model.
 
 ```{r}
-coefs <- coefficients(fit, s = 0)[-1]
-print(coefs)
+coefs <- fit$coefficients[-1]
 lambda <- exp(coefs[1:2])
 alpha <- matrix(c(coefs[3], 
                   coefs[4], 
@@ -100,15 +98,13 @@ fit <- ppjsdm::gibbsm(configuration,
                       model = "Geyer", 
                       radius = radii,
                       use_glmnet = TRUE)
-fit <- fit$complete
-plot(fit)
+plot(fit$complete)
 ```
 
 Note that in this case the model is not degenerate; indeed we can sample from it as follows.
 
 ```{r}
-coefs <- coefficients(fit, s = 0)[-1]
-print(coefs)
+coefs <- fit$coefficients[-1]
 lambda <- exp(coefs[1:2])
 alpha <- matrix(c(coefs[3], 
                   coefs[4], 
