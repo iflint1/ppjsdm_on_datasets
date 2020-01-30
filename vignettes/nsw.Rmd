@@ -44,6 +44,17 @@ window <- nsw$window
 covariates <- nsw$covariates
 ```
 
+Some of the covariates give `NA` values at some locations in the configuration, so we have to remove these points from the configuration.
+
+```{r}
+for(covariate in append(covariates, list(window))) {
+  ok <- inside.owin(x_coordinates(configuration), y_coordinates(configuration), covariate)
+  configuration <- Configuration(x_coordinates(configuration)[ok], 
+                                 y_coordinates(configuration)[ok],
+                                 types(configuration)[ok])
+}
+```
+
 The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
