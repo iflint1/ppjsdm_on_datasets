@@ -54,7 +54,7 @@ The matrix `radii` models interaction radii within a species, and between specie
 ```{r}
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
-                      model = "Geyer", 
+                      model = "Geyer",
                       radius = radii,
                       use_glmnet = TRUE)
 plot(fit$complete)
