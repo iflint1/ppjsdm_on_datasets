@@ -46,7 +46,11 @@ plot(configuration, window = window)
 We fit the data with the Geyer model.
 
 ```{r}
-radii <- matrix(0.05, 6, 6)
+short_range <- matrix(0.025, 6, 6)
+medium_range <- matrix(0.025, 6, 6)
+long_range <- matrix(0.05, 6, 6)
+model <- "Geyer"
+medium_range_model <- "Geyer"
 ```
 
 The matrix `radii` models interaction radii within a species, and between species.
@@ -54,11 +58,13 @@ The matrix `radii` models interaction radii within a species, and between specie
 ```{r}
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
-                      model = "Geyer",
-                      radius = radii,
+                      model = model,
+                      medium_range_model = medium_range_model,
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
                       use_glmnet = TRUE)
 plot(fit$complete)
 plot(fit$cv)
-print(coefficients(fit$complete))
+print(fit$coefficients)
 ```
-

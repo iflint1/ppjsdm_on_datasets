@@ -44,7 +44,7 @@ window <- nsw$window
 covariates <- nsw$covariates
 ```
 
-Some of the covariates give `NA` values at some locations in the configuration, so we have to remove these points from the configuration.
+Some of the covariates give `NA` values at some locations in the configuration, so we have to remove these points
 
 ```{r}
 for(covariate in append(covariates, list(window))) {
@@ -58,6 +58,7 @@ for(covariate in append(covariates, list(window))) {
 The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
+print(configuration)
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
@@ -65,7 +66,12 @@ plot(configuration, window = window)
 The matrix `radii` defined below models interaction radii within a species (on the diagonal), and between species (outside the diagonal).
 
 ```{r}
-radii <- matrix(0.1, number_of_species, number_of_species)
+short_range <- matrix(0.0005, number_of_species, number_of_species)
+medium_range <- diag(0.0005, number_of_species)
+long_range <- medium_range + diag(0.001, number_of_species)
+
+model <- "Geyer"
+medium_range_model <- "Geyer"
 ```
 
 Fitting the model to the dataset is then quite easy.
@@ -74,8 +80,11 @@ Fitting the model to the dataset is then quite easy.
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
                       covariates = covariates, 
-                      model = "Geyer", 
-                      radius = radii,
+                      model = model, 
+                      medium_range_model = medium_range_model,
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
                       use_glmnet = TRUE)
 plot(fit$complete)
 plot(fit$cv)

@@ -55,72 +55,93 @@ The function `gibbsm` fits a multivariate Gibbs point process to our dataset.
 For example,
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, use_glmnet = TRUE)
-plot(fit$complete)
-```
+short_range <- matrix(0.5, number_of_species, number_of_species)
+medium_range <- matrix(1, number_of_species, number_of_species)
+long_range <- matrix(3, number_of_species, number_of_species)
 
-By default, the function fits the model that was introduced in the ARC grant [TODO: Add reference].
-This model has many drawbacks, the most important of which is that the model with the fitted values is degenerate, as can be seen by drawing from the model.
-
-```{r}
-coefs <- fit$coefficients[-1]
-lambda <- exp(coefs[1:2])
-alpha <- matrix(c(coefs[3], 
-                  coefs[4], 
-                  coefs[4], 
-                  coefs[5]), 
-                ncol = number_of_species, 
-                nrow = number_of_species)
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       types = levels(types(configuration)),
-                       steps = 1000000)
-```
-
-```{r}
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(draw, window = window)
-```
-
-The Geyer model is better suited to most situations, but the user needs to specify some additional parameters before the fitting may take place.
-
-```{r}
-radii <- matrix(5, number_of_species, number_of_species)
-```
-
-The matrix `radii` models interaction radii within a species, and between species.
-An interaction radius of $5$ gives good results in the fitting procedure.
-
-```{r}
 fit <- ppjsdm::gibbsm(configuration, 
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
                       window = window, 
-                      model = "Geyer", 
-                      radius = radii,
                       use_glmnet = TRUE)
 plot(fit$complete)
 ```
 
-Note that in this case the model is not degenerate; indeed we can sample from it as follows.
+It is then possible to draw from the model, as can be seen below.
 
 ```{r}
-coefs <- fit$coefficients[-1]
-lambda <- exp(coefs[1:2])
-alpha <- matrix(c(coefs[3], 
-                  coefs[4], 
-                  coefs[4], 
-                  coefs[5]), 
-                ncol = number_of_species, 
-                nrow = number_of_species)
-draw <- ppjsdm::rgibbs(window = window,
+parameters <- get_parameters_from_fit(fit)
+lambda <- parameters$lambda
+alpha <- parameters$alpha
+gamma <- parameters$gamma
+draw <- ppjsdm::rgibbs(window = window, 
                        alpha = alpha, 
-                       lambda = lambda,
-                       model = "Geyer", 
-                       radius = radii,
+                       lambda = lambda, 
+                       gamma = gamma,
+                       short_range = short_range,
+                       medium_range = medium_range,
+                       long_range = long_range,
                        types = levels(types(configuration)))
-```
+print(draw)
 
-```{r}
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(draw, window = window)
+```
+
+Let us increase the number of species accounted for.
+
+```{r}
+index_of_plot <- 3 # Between 1 and 20
+year <- 2011 # Year of census
+number_of_species <- 5 # Includes the most prevalent species from the plot
+
+qld <- get_qld(index = index_of_plot,
+               year = year, 
+               prevalent = number_of_species)
+configuration <- qld$configuration
+window <- qld$window
+
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(configuration, window = window)
+
+short_range <- matrix(4, number_of_species, number_of_species)
+medium_range <- diag(0, number_of_species)
+long_range <- medium_range + diag(0, number_of_species)
+
+model <- "square_bump"
+medium_range_model <- "square_exponential"
+
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
+                      model = model,
+                      medium_range_model = medium_range_model,
+                      use_glmnet = TRUE)
+plot(fit$complete)
+```
+
+We may then plot the corresponding Papangelou conditional intensity.
+
+```{r}
+parameters <- get_parameters_from_fit(fit)
+lambda <- parameters$lambda
+alpha <- parameters$alpha
+gamma <- parameters$gamma
+plot_papangelou(window = window,
+                configuration = configuration,
+                type = 2, 
+                model = model, 
+                medium_range_model = medium_range_model, 
+                alpha = alpha, 
+                lambda = lambda, 
+                beta = matrix(0, number_of_species, 0), 
+                gamma = gamma, 
+                covariates = list(), 
+                short_range = short_range, 
+                medium_range = medium_range, 
+                long_range = long_range, 
+                saturation = 2) 
 ```

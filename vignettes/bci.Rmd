@@ -33,7 +33,7 @@ This vignette explains how to use the `ppjsdm` package with the Barro Colorado I
 We begin by loading the data with only the most prevalent species.
 
 ```{r}
-number_of_species <- 5
+number_of_species <- 10
 bci <- get_bci(prevalent = number_of_species)
 configuration <- bci$configuration
 window <- bci$window
@@ -61,11 +61,11 @@ plot(covariates$elevation)
 plot(covariates$gradient)
 ```
 
-The matrix `radii` defined below models interaction radii within a species (on the diagonal), and between species (outside the diagonal).
+The matrix `short_range` defined below models short range interaction radii within a species (on the diagonal), and between species (outside the diagonal).
 One could play around with different interaction radii, but any homogeneous interaction radius of less than $10\,\mathrm{m}$ tends to work well.
 
 ```{r}
-radii <- matrix(3, number_of_species, number_of_species)
+short_range <- matrix(3, number_of_species, number_of_species)
 ```
 
 Fitting the model to the dataset is then quite easy.
@@ -75,7 +75,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       window = window, 
                       covariates = covariates, 
                       model = "Geyer", 
-                      radius = radii,
+                      short_range = short_range,
                       use_glmnet = TRUE)
 plot(fit$complete)
 plot(fit$cv)

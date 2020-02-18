@@ -6,6 +6,7 @@ get_nsw <- function(prevalent = 2) {
   
   covariates <- lapply(as.list(covariates_raster), 
                        function(element) maptools::as.im.RasterLayer(element))
+  names(covariates) <- names(covariates_raster)
   
   window <- covariates[[1]]
   
