@@ -1,8 +1,8 @@
 ---
-title: "Lansing dataset"
+title: "Norwegian spruces dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{lansing}
+  %\VignetteIndexEntry{spruces}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -27,17 +27,20 @@ remove(list = ls())
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the Lansing dataset from `spatstat`.
+This vignette explains how to use the `ppjsdm` package with the `spruces` dataset from `spatstat`.
 We begin by loading the data with all species.
 
 ```{r}
-configuration <- as.Configuration(lansing)
-window <- Rectangle_window(c(0, 1), c(0, 1))
+truncated_spruces <- spruces
+# Window(truncated_spruces) <-  owin(c(3, 56), c(0, 35))
+configuration <- Configuration(truncated_spruces$x, truncated_spruces$y, marks = truncated_spruces$marks)
+window <- Rectangle_window(c(0, 56), c(0, 38))
 ```
 
 The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
+print(configuration)
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
@@ -45,10 +48,10 @@ plot(configuration, window = window)
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
-short_range <- c(0, 0.1)
-medium_range <- c(0, 0.1)
-long_range <- c(0, 0.1)
-model <- "square_bump"
+short_range <- c(0, 20)
+medium_range <- c(0, 20)
+long_range <- c(0, 20)
+model <- "square_exponential"
 medium_range_model <- "square_exponential"
 ```
 
@@ -62,7 +65,9 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = TRUE)
+                      use_glmnet = TRUE,
+                      use_aic = TRUE,
+                      saturation = 2)
 plot(fit$complete)
 print(fit$coefficients)
 print(fit$best_short)
@@ -82,15 +87,41 @@ gamma <- parameters$gamma
 plot_papangelou(window = window,
                 configuration = configuration,
                 type = 1, 
+                mark = mean(spruces$marks),
                 model = model, 
                 medium_range_model = medium_range_model, 
                 alpha = alpha, 
                 lambda = lambda, 
-                beta = matrix(0, 6, 0), 
+                beta = matrix(0, 1, 0), 
                 gamma = gamma, 
                 covariates = list(), 
                 short_range = fit$best_short, 
                 medium_range = fit$best_medium, 
                 long_range = fit$best_long, 
                 saturation = 2) 
+```
+
+It is also possible to draw from the model.
+
+```{r}
+parameters <- get_parameters_from_fit(fit)
+lambda <- parameters$lambda
+alpha <- parameters$alpha
+gamma <- parameters$gamma
+draw <- ppjsdm::rgibbs(window = window, 
+                       alpha = alpha, 
+                       lambda = lambda, 
+                       gamma = gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = fit$best_short, 
+                       medium_range = fit$best_medium, 
+                       long_range = fit$best_long, 
+                       types = levels(types(configuration)),
+                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       steps = 10000000)
+print(draw)
+
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(draw, window = window)
 ```

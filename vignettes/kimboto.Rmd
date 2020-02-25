@@ -1,8 +1,8 @@
 ---
-title: "Lansing dataset"
+title: "Kimboto dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{lansing}
+  %\VignetteIndexEntry{kimboto}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -27,12 +27,12 @@ remove(list = ls())
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the Lansing dataset from `spatstat`.
+This vignette explains how to use the `ppjsdm` package with the kimboto dataset from `spatstat`.
 We begin by loading the data with all species.
 
 ```{r}
-configuration <- as.Configuration(lansing)
-window <- Rectangle_window(c(0, 1), c(0, 1))
+configuration <- Configuration(paracou)
+window <- Rectangle_window(c(0, 400.8568), c(0, 524.4037))
 ```
 
 The point configuration is plotted below.
@@ -45,10 +45,10 @@ plot(configuration, window = window)
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
-short_range <- c(0, 0.1)
-medium_range <- c(0, 0.1)
-long_range <- c(0, 0.1)
-model <- "square_bump"
+short_range <- c(0, 20)
+medium_range <- c(0, 20)
+long_range <- c(0, 20)
+model <- "square_exponential"
 medium_range_model <- "square_exponential"
 ```
 
@@ -93,4 +93,41 @@ plot_papangelou(window = window,
                 medium_range = fit$best_medium, 
                 long_range = fit$best_long, 
                 saturation = 2) 
+
+plot_papangelou(window = window,
+                configuration = configuration,
+                type = 2, 
+                model = model, 
+                medium_range_model = medium_range_model, 
+                alpha = alpha, 
+                lambda = lambda, 
+                beta = matrix(0, 6, 0), 
+                gamma = gamma, 
+                covariates = list(), 
+                short_range = fit$best_short, 
+                medium_range = fit$best_medium, 
+                long_range = fit$best_long, 
+                saturation = 2) 
 ```
+
+It is also possible to draw from the model.
+
+```{r}
+parameters <- get_parameters_from_fit(fit)
+lambda <- parameters$lambda
+alpha <- parameters$alpha
+gamma <- parameters$gamma
+draw <- ppjsdm::rgibbs(window = window, 
+                       alpha = alpha, 
+                       lambda = lambda, 
+                       gamma = gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = fit$best_short, 
+                       medium_range = fit$best_medium, 
+                       long_range = fit$best_long, 
+                       types = levels(types(configuration)))
+print(draw)
+
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(draw, window = window)
