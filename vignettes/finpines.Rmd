@@ -1,8 +1,8 @@
 ---
-title: "Norwegian spruces dataset"
+title: "Fin pines dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{spruces}
+  %\VignetteIndexEntry{finpines}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -27,7 +27,7 @@ remove(list = ls())
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the `spruces` dataset from `spatstat`.
+This vignette explains how to use the `ppjsdm` package with the `finpines` dataset from `spatstat`.
 
 # Taking marks into account
 
@@ -35,8 +35,8 @@ If marks are provided, the interaction radii are proportional to the marks.
 We begin with that setting.
 
 ```{r}
-configuration <- Configuration(spruces$x, spruces$y, marks = spruces$marks)
-window <- Rectangle_window(c(0, 56), c(0, 38))
+configuration <- Configuration(finpines$x, finpines$y, marks = finpines$marks$height)
+window <- Rectangle_window(c(-5, 5), c(-8, 2))
 ```
 
 The point configuration is plotted below.
@@ -133,7 +133,7 @@ plot(draw, window = window)
 In this section, we do not account for marks.
 
 ```{r}
-configuration <- Configuration(spruces$x, spruces$y)
+configuration <- Configuration(finpines$x, finpines$y)
 ```
 
 We call the fitting function on this unmarked point process.
@@ -180,85 +180,6 @@ plot_papangelou(window = window,
                 medium_range = fit$best_medium, 
                 long_range = fit$best_long, 
                 saturation = 2) 
-```
-
-And as previously, we draw from the model.
-
-```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = fit$best_short, 
-                       medium_range = fit$best_medium, 
-                       long_range = fit$best_long, 
-                       types = levels(types(configuration)),
-                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
-                       steps = 10000000)
-print(draw)
-
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(draw, window = window)
-```
-
-# Comparison to classical Hard-core model.
-
-```{r}
-configuration <- Configuration(spruces$x, spruces$y)
-model <- "Geyer"
-medium_range_model <- "Geyer"
-```
-
-We call the fitting function on this unmarked point process.
-
-```{r}
-fit <- ppjsdm::gibbsm(configuration, 
-                      window = window, 
-                      model = model,
-                      medium_range_model = medium_range_model,
-                      short_range = short_range,
-                      medium_range = medium_range,
-                      long_range = long_range,
-                      use_glmnet = TRUE,
-                      use_aic = TRUE,
-                      saturation = 1)
-plot(fit$complete)
-print(fit$coefficients)
-print(fit$best_short)
-print(fit$best_medium)
-print(fit$best_long)
-print(fit$aic)
-print(fit$bic)
-```
-
-We may then plot the corresponding Papangelou conditional intensity.
-
-```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 1, 
-                mark = mean(get_marks(configuration)),
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 1, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 1) 
 ```
 
 And as previously, we draw from the model.

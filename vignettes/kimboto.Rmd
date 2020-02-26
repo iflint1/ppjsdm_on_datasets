@@ -31,6 +31,7 @@ This vignette explains how to use the `ppjsdm` package with the kimboto dataset 
 We begin by loading the data with all species.
 
 ```{r}
+print(paracou)
 configuration <- Configuration(paracou)
 window <- Rectangle_window(c(0, 400.8568), c(0, 524.4037))
 ```
@@ -86,7 +87,7 @@ plot_papangelou(window = window,
                 medium_range_model = medium_range_model, 
                 alpha = alpha, 
                 lambda = lambda, 
-                beta = matrix(0, 6, 0), 
+                beta = matrix(0, 2, 0), 
                 gamma = gamma, 
                 covariates = list(), 
                 short_range = fit$best_short, 
@@ -101,7 +102,7 @@ plot_papangelou(window = window,
                 medium_range_model = medium_range_model, 
                 alpha = alpha, 
                 lambda = lambda, 
-                beta = matrix(0, 6, 0), 
+                beta = matrix(0, 2, 0), 
                 gamma = gamma, 
                 covariates = list(), 
                 short_range = fit$best_short, 
@@ -126,7 +127,9 @@ draw <- ppjsdm::rgibbs(window = window,
                        short_range = fit$best_short, 
                        medium_range = fit$best_medium, 
                        long_range = fit$best_long, 
-                       types = levels(types(configuration)))
+                       types = levels(types(configuration)),
+                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       steps = 10000000)
 print(draw)
 
 par(mar = c(5, 4, 4, 13) + 0.1)
