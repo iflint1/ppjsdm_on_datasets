@@ -1,8 +1,8 @@
 ---
-title: "Lansing dataset"
+title: "Swamp forest dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{lansing}
+  %\VignetteIndexEntry{swamp}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,23 +21,23 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(ppjsdm)
-library(spatstat)
+library(ecespa)
 library(plot.matrix)
 remove(list = ls())
 
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the Lansing dataset from `spatstat`.
-Locations and botanical classification of trees in Lansing Woods.
-The data come from an investigation of a 924 ft x 924 ft (19.6 acre) plot in Lansing Woods, Clinton County, Michigan USA by D.J. Gerrard. 
-The data give the locations of 2251 trees and their botanical classification (into hickories, maples, red oaks, white oaks, black oaks and miscellaneous trees). 
-The original plot size (924 x 924 feet) has been rescaled to the unit square.
+This vignette explains how to use the `ppjsdm` package with the `swamp` dataset from `ecespa`.
+Locations and botanical classification of trees in a plot in the Savannah River. 
+Locations are given in metres, rounded to the nearest 0.1 metre. 
+The data come from a 1-ha (200 m x 50 m) plot in the Savannah River Site, South Carolina, USA. 
+The 734 mapped stems included 156 Carolina ash (Fraxinus caroliniana), 215 Water tupelo (Nyssa aquatica), 205 Swamp tupelo (Nyssa sylvatica), 98 Bald cypress (Taxodium distichum) and 60 stems of 8 additional species.
 We begin by loading the data with all species.
 
 ```{r}
-configuration <- as.Configuration(lansing)
-window <- Rectangle_window(c(0, 1), c(0, 1))
+configuration <- Configuration(swamp$y, swamp$x, swamp$sp)
+window <- Rectangle_window(c(0, 200), c(0, 50))
 ```
 
 The point configuration is plotted below.
@@ -50,13 +50,14 @@ plot(configuration, window = window)
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
-short_range <- c(0, 0.1)
-medium_range <- c(0, 0.1)
-long_range <- c(0, 0.1)
-model <- "square_bump"
+short_range <- c(0, 20)
+medium_range <- c(0, 20)
+long_range <- c(0, 20)
+model <- "square_exponential"
 medium_range_model <- "square_exponential"
-max_points <- 2300
+max_points <- 1000
 saturation <- 2
+steps <- 100000
 ```
 
 We can now call the fitting function.
@@ -69,11 +70,10 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE,
-                      saturation = saturation)
-# print(summary(fit))
+                      use_glmnet = FALSE)
+print(summary(fit))
 print(fit$coefficients)
-par(mar = c(5.1, 5.1, 4.1, 4.1))
+par(mar=c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
 print(fit$aic)
@@ -96,7 +96,7 @@ We may then plot the corresponding Papangelou conditional intensity.
 #                 covariates = list(), 
 #                 short_range = parameters$short_range, 
 #                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range,
+#                 long_range = parameters$long_range, 
 #                 saturation = saturation,
 #                 max_points = max_points) 
 ```

@@ -1,4 +1,4 @@
-get_bci <- function(prevalent = 2, jitter = .1) {
+get_bci <- function(least_prevalent = 1, most_prevalent = 2, jitter = .1) {
   load("../data/bci.tree8.rdata")
   raw_data <- bci.tree8
   
@@ -6,7 +6,7 @@ get_bci <- function(prevalent = 2, jitter = .1) {
   raw_data <- raw_data[raw_data$status == "A", ]
 
   sp_prevalence <- rev(sort(table(raw_data$sp)))
-  sp_keep <- names(sp_prevalence)[1:prevalent]
+  sp_keep <- names(sp_prevalence)[least_prevalent:most_prevalent]
   raw_data <- raw_data[raw_data$sp %in% sp_keep, ]
 
   number_locations <- length(raw_data$gx)

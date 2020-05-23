@@ -1,8 +1,8 @@
 ---
-title: "Fin pines dataset"
+title: "Seedlings dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{finpines}
+  %\VignetteIndexEntry{seedlings1}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,23 +21,25 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(ppjsdm)
-library(spatstat)
+library(ecespa)
 remove(list = ls())
 
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the `finpines` dataset from `spatstat`.
-The data record the locations of 126 pine saplings in a Finnish forest, their heights and their diameters.
+This vignette explains how to use the `ppjsdm` package with the `seedlings1` dataset from `ecespa`.
+This dataset is a marked point pattern of seedlings of H. squamatumgrowing in a gyp-sophylous plant community in Central Spain.
+The datasets contains the locations of the seedlings marked with their heigth. 
+Both the coordinates and the heigth of the seedlings are given in cm.
 
 # Taking marks into account
 
-If marks are provided, the interaction radii are proportional to the marks.
-We begin with that setting, choosing the height (rather than the diameter) as the relevant mark.
+If marks (i.e. their height) are provided, the interaction radii are proportional to the marks.
+We begin with that setting.
 
 ```{r}
-configuration <- Configuration(finpines$x, finpines$y, marks = finpines$marks$height)
-window <- Rectangle_window(c(-5, 5), c(-8, 2))
+configuration <- Configuration(seedlings1$x, seedlings1$y, marks = seedlings1$marks)
+window <- Rectangle_window(c(0, 325), c(0, 300))
 ```
 
 The point configuration is plotted below.
@@ -56,7 +58,6 @@ medium_range <- c(0, 20)
 long_range <- c(0, 20)
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
-max_points <- 150
 saturation <- 2
 steps <- 100000
 ```
@@ -71,9 +72,9 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
+                      use_glmnet = FALSE,
                       use_aic = TRUE,
-                      saturation = saturation,
-                      use_glmnet = FALSE)
+                      saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
 print(fit$aic)
@@ -98,8 +99,7 @@ parameters <- fit$coefficients
 #                 short_range = parameters$short_range, 
 #                 medium_range = parameters$medium_range, 
 #                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
+#                 saturation = saturation) 
 ```
 
 It is also possible to draw from the model.
@@ -126,10 +126,10 @@ plot(draw, window = window)
 
 # Interaction radii not proportional to marks
 
-In this section, we disregard the height of the saplings, and consider interaction radii in metres.
+In this section, we disregard the height of the seedlings, and consider interaction radii in centimetres.
 
 ```{r}
-configuration <- Configuration(finpines$x, finpines$y)
+configuration <- Configuration(seedlings1$x, seedlings1$y)
 ```
 
 We call the fitting function on this unmarked point process.
@@ -142,9 +142,9 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
+                      use_glmnet = FALSE,
                       use_aic = TRUE,
-                      saturation = saturation,
-                      use_glmnet = FALSE)
+                      saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
 print(fit$aic)
@@ -157,20 +157,19 @@ We may then plot the corresponding Papangelou conditional intensity.
 parameters <- fit$coefficients
 # plot_papangelou(window = window,
 #                 configuration = configuration,
-#                 type = 1, 
+#                 type = 1,
 #                 mark = mean(get_marks(configuration)),
-#                 model = model, 
-#                 medium_range_model = medium_range_model, 
-#                 alpha = parameters$alpha, 
-#                 lambda = beta0$beta0, 
-#                 beta = matrix(0, 1, 0), 
-#                 gamma = parameters$gamma, 
-#                 covariates = list(), 
-#                 short_range = parameters$short_range, 
-#                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
+#                 model = model,
+#                 medium_range_model = medium_range_model,
+#                 alpha = parameters$alpha,
+#                 beta0 = parameters$beta0,
+#                 beta = matrix(0, 1, 0),
+#                 gamma = parameters$gamma,
+#                 covariates = list(),
+#                 short_range = parameters$short_range,
+#                 medium_range = parameters$medium_range,
+#                 long_range = parameters$long_range,
+#                 saturation = saturation)
 ```
 
 And as previously, we draw from the model.
@@ -186,8 +185,8 @@ draw <- ppjsdm::rgibbs(window = window,
                        medium_range = parameters$medium_range,
                        long_range = parameters$long_range,
                        types = levels(types(configuration)),
-                       saturation = saturation,
                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       saturation = saturation,
                        steps = steps)
 print(draw)
 

@@ -22,6 +22,7 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(ppjsdm)
 library(spatstat)
+library(plot.matrix)
 remove(list = ls())
 
 source("../R/get_bci.R")
@@ -33,8 +34,8 @@ This vignette explains how to use the `ppjsdm` package with the Barro Colorado I
 We begin by loading the data with only the most prevalent species.
 
 ```{r}
-number_of_species <- 10
-bci <- get_bci(prevalent = number_of_species)
+number_of_species <- 7
+bci <- get_bci(least_prevalent = 50, most_prevalent = 50 + number_of_species)
 configuration <- bci$configuration
 window <- bci$window
 ```
@@ -66,17 +67,28 @@ One could play around with different interaction radii, but any homogeneous inte
 
 ```{r}
 short_range <- matrix(3, number_of_species, number_of_species)
+medium_range <- matrix(3, number_of_species, number_of_species)
+long_range <- matrix(10, number_of_species, number_of_species)
 ```
 
 Fitting the model to the dataset is then quite easy.
 
 ```{r}
+tm <- Sys.time()
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
                       covariates = covariates, 
                       model = "Geyer", 
+                      medium_range_model = "Geyer", 
                       short_range = short_range,
-                      use_glmnet = TRUE)
-plot(fit$complete)
-plot(fit$cv)
+                      medium_range = medium_range,
+                      long_range = long_range,
+                      use_glmnet = FALSE)
+print(Sys.time() - tm)
+print(fit$coefficients)
+par(mar = c(5.1, 5.1, 4.1, 4.1))
+plot(fit$coefficients$alpha)
+plot(fit$coefficients$gamma)
+print(fit$aic)
+print(fit$bic)
 ```

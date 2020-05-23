@@ -22,6 +22,7 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(ppjsdm)
 library(spatstat)
+library(plot.matrix)
 remove(list = ls())
 
 source("../R/get_qld.R")
@@ -55,43 +56,48 @@ The function `gibbsm` fits a multivariate Gibbs point process to our dataset.
 For example,
 
 ```{r}
-short_range <- matrix(0.5, number_of_species, number_of_species)
-medium_range <- matrix(1, number_of_species, number_of_species)
-long_range <- matrix(3, number_of_species, number_of_species)
+short_range <- c(0, 10)
+medium_range <- c(0, 10)
+long_range <- c(0, 10)
 
 fit <- ppjsdm::gibbsm(configuration, 
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
                       window = window, 
-                      use_glmnet = TRUE)
-plot(fit$complete)
+                      use_glmnet = FALSE)
+print(fit$coefficients)
+par(mar = c(5.1, 5.1, 4.1, 4.1))
+plot(fit$coefficients$alpha)
+plot(fit$coefficients$gamma)
+print(fit$aic)
+print(fit$bic)
 ```
 
 It is then possible to draw from the model, as can be seen below.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
-                       short_range = short_range,
-                       medium_range = medium_range,
-                       long_range = long_range,
-                       types = levels(types(configuration)))
-print(draw)
-
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(draw, window = window)
+# parameters <- fit$coefficients
+# draw <- ppjsdm::rgibbs(window = window, 
+#                        alpha = parameters$alpha, 
+#                        lambda = parameters$lambda, 
+#                        gamma = parameters$gamma,
+#                        short_range = parameters$short_range,
+#                        medium_range = parameters$medium_range,
+#                        long_range = parameters$long_range,
+#                        types = levels(types(configuration)))
+# print(draw)
+# 
+# par(mar = c(5, 4, 4, 13) + 0.1)
+# plot(draw, window = window)
 ```
 
 Let us increase the number of species accounted for.
 
 ```{r}
+saturation <- 2
+max_points <- 1000
+
 index_of_plot <- 3 # Between 1 and 20
 year <- 2011 # Year of census
 number_of_species <- 5 # Includes the most prevalent species from the plot
@@ -105,9 +111,9 @@ window <- qld$window
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 
-short_range <- matrix(4, number_of_species, number_of_species)
-medium_range <- diag(0, number_of_species)
-long_range <- medium_range + diag(0, number_of_species)
+short_range <- c(0, 10)
+medium_range <- c(0, 10)
+long_range <- c(0, 10)
 
 model <- "square_bump"
 medium_range_model <- "square_exponential"
@@ -119,29 +125,32 @@ fit <- ppjsdm::gibbsm(configuration,
                       long_range = long_range,
                       model = model,
                       medium_range_model = medium_range_model,
-                      use_glmnet = TRUE)
-plot(fit$complete)
+                      use_glmnet = FALSE)
+print(fit$coefficients)
+par(mar = c(5.1, 5.1, 4.1, 4.1))
+plot(fit$coefficients$alpha)
+plot(fit$coefficients$gamma)
+print(fit$aic)
+print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 2, 
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, number_of_species, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = short_range, 
-                medium_range = medium_range, 
-                long_range = long_range, 
-                saturation = 2) 
+parameters <- fit$coefficients
+# plot_papangelou(window = window,
+#                 configuration = configuration,
+#                 type = 2, 
+#                 model = model, 
+#                 medium_range_model = medium_range_model, 
+#                 alpha = parameters$alpha, 
+#                 lambda = parameters$lambda, 
+#                 beta = matrix(0, number_of_species, 0), 
+#                 gamma = parameters$gamma, 
+#                 covariates = list(), 
+#                 short_range = parameters$short_range, 
+#                 medium_range = parameters$medium_range, 
+#                 long_range = parameters$long_range, 
+#                 saturation = saturation,
+#                 max_points = max_points) 
 ```

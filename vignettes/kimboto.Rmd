@@ -22,12 +22,19 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(ppjsdm)
 library(spatstat)
+library(plot.matrix)
 remove(list = ls())
 
 set.seed(1)
 ```
 
 This vignette explains how to use the `ppjsdm` package with the kimboto dataset from `spatstat`.
+This dataset is a point pattern of adult and juvenile Kimboto trees (Pradosia cochlearia or P. ptychandra) recorded at Paracou in French Guiana. 
+See Flores (2005).
+
+The dataset paracou is a point pattern (object of class "ppp") containing the spatial coordinates of each tree, marked by age (a factor with levels adult and juvenile. 
+The survey region is a rectangle approximately 400 by 525 metres. 
+Coordinates are given in metres.
 We begin by loading the data with all species.
 
 ```{r}
@@ -42,7 +49,7 @@ The point configuration is plotted below.
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
-
+  
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
@@ -51,24 +58,27 @@ medium_range <- c(0, 20)
 long_range <- c(0, 20)
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
+steps <- 100000
+max_points <- 1000
+saturation <- 2
 ```
 
 We can now call the fitting function.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, 
+fit <- suppressWarnings(ppjsdm::gibbsm(configuration, 
                       window = window, 
                       model = model,
                       medium_range_model = medium_range_model,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = TRUE)
-plot(fit$complete)
+                      use_glmnet = FALSE))
+print(summary(fit))
 print(fit$coefficients)
-print(fit$best_short)
-print(fit$best_medium)
-print(fit$best_long)
+par(mar=c(5.1, 5.1, 4.1, 4.1))
+plot(fit$coefficients$alpha)
+plot(fit$coefficients$gamma)
 print(fit$aic)
 print(fit$bic)
 ```
@@ -76,60 +86,56 @@ print(fit$bic)
 We may then plot the corresponding Papangelou conditional intensity.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 1, 
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 2, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 2) 
-
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 2, 
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 2, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 2) 
+parameters <- fit$coefficients
+# plot_papangelou(window = window,
+#                 configuration = configuration,
+#                 type = 1, 
+#                 model = model, 
+#                 medium_range_model = medium_range_model, 
+#                 alpha = parameters$alpha, 
+#                 lambda = parameters$lambda, 
+#                 beta = matrix(0, 2, 0), 
+#                 gamma = parameters$gamma, 
+#                 covariates = list(), 
+#                 short_range = parameters$short_range, 
+#                 medium_range = parameters$medium_range, 
+#                 long_range = parameters$long_range, 
+#                 saturation = saturation,
+#                 max_points = max_points) 
+# 
+# plot_papangelou(window = window,
+#                 configuration = configuration,
+#                 type = 2, 
+#                 model = model, 
+#                 medium_range_model = medium_range_model, 
+#                 alpha = parameters$alpha, 
+#                 lambda = parameters$lambda, 
+#                 beta = matrix(0, 2, 0), 
+#                 gamma = parameters$gamma, 
+#                 covariates = list(), 
+#                 short_range = parameters$short_range, 
+#                 medium_range = parameters$medium_range, 
+#                 long_range = parameters$long_range, 
+#                 saturation = saturation,
+#                 max_points = max_points) 
 ```
 
 It is also possible to draw from the model.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
                        model = model,
                        medium_range_model = medium_range_model,
-                       short_range = fit$best_short, 
-                       medium_range = fit$best_medium, 
-                       long_range = fit$best_long, 
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
                        types = levels(types(configuration)),
                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
-                       steps = 10000000)
+                       saturation = saturation,
+                       steps = steps)
 print(draw)
 
 par(mar = c(5, 4, 4, 13) + 0.1)

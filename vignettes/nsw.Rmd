@@ -25,6 +25,7 @@ library(ppjsdm)
 library(raster)
 library(sf)
 library(spatstat)
+library(plot.matrix)
 remove(list = ls())
 
 source("../R/get_nsw.R")
@@ -85,7 +86,11 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = TRUE)
-plot(fit$complete)
-plot(fit$cv)
+                      use_glmnet = FALSE)
+print(fit$coefficients)
+par(mar = c(5.1, 5.1, 4.1, 4.1))
+plot(fit$coefficients$alpha)
+plot(fit$coefficients$gamma)
+print(fit$aic)
+print(fit$bic)
 ```

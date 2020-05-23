@@ -1,8 +1,8 @@
 ---
-title: "Lansing dataset"
+title: "Helianthemum dataset"
 output: pdf_document
 vignette: >
-  %\VignetteIndexEntry{lansing}
+  %\VignetteIndexEntry{helianthemum}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,28 +21,26 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(ppjsdm)
-library(spatstat)
+library(ecespa)
 library(plot.matrix)
 remove(list = ls())
 
 set.seed(1)
 ```
 
-This vignette explains how to use the `ppjsdm` package with the Lansing dataset from `spatstat`.
-Locations and botanical classification of trees in Lansing Woods.
-The data come from an investigation of a 924 ft x 924 ft (19.6 acre) plot in Lansing Woods, Clinton County, Michigan USA by D.J. Gerrard. 
-The data give the locations of 2251 trees and their botanical classification (into hickories, maples, red oaks, white oaks, black oaks and miscellaneous trees). 
-The original plot size (924 x 924 feet) has been rescaled to the unit square.
-We begin by loading the data with all species.
+This vignette explains how to use the `ppjsdm` package with the `Helianthemum` dataset from `ecespa`.
+Locations of H. squamatum adult plants and seedlings in a 6 m x 7 m plot over gypsum soil in Chinchón (near Madrid, Spain). These are part of the data collected by Romao (2003) that have been analyzed several times (Escudero et al.2005, De la Cruz 2006, De la Cruz et al. in press. ). 
+The coordinates of the plans are given in cm.
 
 ```{r}
-configuration <- as.Configuration(lansing)
-window <- Rectangle_window(c(0, 1), c(0, 1))
+configuration <- Configuration(Helianthemum)
+window <- Rectangle_window(c(2, 600), c(2, 699))
 ```
 
 The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
+print(configuration)
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
@@ -50,13 +48,14 @@ plot(configuration, window = window)
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
-short_range <- c(0, 0.1)
-medium_range <- c(0, 0.1)
-long_range <- c(0, 0.1)
-model <- "square_bump"
-medium_range_model <- "square_exponential"
-max_points <- 2300
+short_range <- c(0, 50)
+medium_range <- c(0, 50)
+long_range <- c(0, 50)
+model <- "Geyer"
+medium_range_model <- "Geyer"
 saturation <- 2
+max_points <- 1000
+steps <- 100000
 ```
 
 We can now call the fitting function.
@@ -70,10 +69,11 @@ fit <- ppjsdm::gibbsm(configuration,
                       medium_range = medium_range,
                       long_range = long_range,
                       use_glmnet = FALSE,
+                      use_aic = TRUE,
                       saturation = saturation)
-# print(summary(fit))
+print(summary(fit))
 print(fit$coefficients)
-par(mar = c(5.1, 5.1, 4.1, 4.1))
+par(mar=c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
 print(fit$aic)
@@ -83,20 +83,42 @@ print(fit$bic)
 We may then plot the corresponding Papangelou conditional intensity.
 
 ```{r}
-# parameters <- fit$coefficients
+parameters <- fit$coefficients
 # plot_papangelou(window = window,
 #                 configuration = configuration,
 #                 type = 1, 
+#                 mark = mean(get_marks(configuration)),
 #                 model = model, 
 #                 medium_range_model = medium_range_model, 
 #                 alpha = parameters$alpha, 
-#                 lambda = parameters$lambda, 
-#                 beta = matrix(0, 6, 0), 
+#                 beta0 = parameters$beta0, 
+#                 beta = matrix(0, 1, 0), 
 #                 gamma = parameters$gamma, 
 #                 covariates = list(), 
 #                 short_range = parameters$short_range, 
 #                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range,
+#                 long_range = parameters$long_range, 
 #                 saturation = saturation,
 #                 max_points = max_points) 
+```
+
+It is also possible to draw from the model.
+
+```{r}
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
+                       types = levels(types(configuration)),
+                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       steps = steps)
+print(draw)
+
+par(mar = c(5, 4, 4, 13) + 0.1)
+plot(draw, window = window)
 ```

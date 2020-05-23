@@ -28,15 +28,18 @@ set.seed(1)
 ```
 
 This vignette explains how to use the `ppjsdm` package with the `spruces` dataset from `spatstat`.
+The data give the locations of Norwegian spruce trees in a natural forest stand in Saxonia, Germany.
+Each tree is marked with its diameter at breast height.
 
 # Taking marks into account
 
-If marks are provided, the interaction radii are proportional to the marks.
+If marks are provided, the interaction radii are proportional to the marks, i.e. their diameter at breast height.
 We begin with that setting.
 
 ```{r}
 configuration <- Configuration(spruces$x, spruces$y, marks = spruces$marks)
 window <- Rectangle_window(c(0, 56), c(0, 38))
+spatstat_window <- owin(c(0, 56), c(0, 38))
 ```
 
 The point configuration is plotted below.
@@ -55,6 +58,8 @@ medium_range <- c(0, 20)
 long_range <- c(0, 20)
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
+saturation <- 2
+steps <- 100000
 ```
 
 We can now call the fitting function.
@@ -67,14 +72,11 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = TRUE,
+                      use_glmnet = FALSE,
                       use_aic = TRUE,
-                      saturation = 2)
-plot(fit$complete)
+                      saturation = saturation)
+print(summary(fit))
 print(fit$coefficients)
-print(fit$best_short)
-print(fit$best_medium)
-print(fit$best_long)
 print(fit$aic)
 print(fit$bic)
 ```
@@ -82,55 +84,72 @@ print(fit$bic)
 We may then plot the corresponding Papangelou conditional intensity.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 1, 
-                mark = mean(get_marks(configuration)),
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 1, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 2) 
+parameters <- fit$coefficients
+# plot_papangelou(window = window,
+#                 configuration = configuration,
+#                 type = 1, 
+#                 mark = mean(get_marks(configuration)),
+#                 model = model, 
+#                 medium_range_model = medium_range_model, 
+#                 alpha = parameters$alpha, 
+#                 beta0 = parameters$beta0, 
+#                 beta = matrix(0, 1, 0), 
+#                 gamma = parameters$gamma, 
+#                 covariates = list(), 
+#                 short_range = parameters$short_range, 
+#                 medium_range = parameters$medium_range, 
+#                 long_range = parameters$long_range, 
+#                 saturation = saturation,
+#                 max_points = max_points) 
 ```
 
 It is also possible to draw from the model.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
                        model = model,
                        medium_range_model = medium_range_model,
-                       short_range = fit$best_short, 
-                       medium_range = fit$best_medium, 
-                       long_range = fit$best_long, 
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
                        types = levels(types(configuration)),
                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
-                       steps = 10000000)
+                       saturation = saturation,
+                       steps = steps)
 print(draw)
 
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(draw, window = window)
+```
+
+A more standard approach to check goodness of fit is a comparison of K functions.
+
+```{r}
+env <- envelope.ppp(ppp(configuration$x, configuration$y, window = spatstat_window), simulate = function(X) {
+  z <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
+                       types = levels(types(configuration)),
+                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       saturation = saturation,
+                       steps = steps)
+  ppp(z$x, z$y, window = spatstat_window)
+  })
+plot(env)
 ```
 
 # Interaction radii not proportional to marks
 
-In this section, we do not account for marks.
+In this section, we disregard the diameter at breast height, and consider interaction radii in metres.
 
 ```{r}
 configuration <- Configuration(spruces$x, spruces$y)
@@ -146,14 +165,11 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = TRUE,
+                        use_glmnet = FALSE,
                       use_aic = TRUE,
-                      saturation = 2)
-plot(fit$complete)
+                      saturation = saturation)
+print(summary(fit))
 print(fit$coefficients)
-print(fit$best_short)
-print(fit$best_medium)
-print(fit$best_long)
 print(fit$aic)
 print(fit$bic)
 ```
@@ -161,127 +177,156 @@ print(fit$bic)
 We may then plot the corresponding Papangelou conditional intensity.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 1, 
-                mark = mean(get_marks(configuration)),
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 1, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 2) 
+parameters <- fit$coefficients
+# plot_papangelou(window = window,
+#                 configuration = configuration,
+#                 type = 1, 
+#                 mark = mean(get_marks(configuration)),
+#                 model = model, 
+#                 medium_range_model = medium_range_model, 
+#                 alpha = parameters$alpha, 
+#                 beta0 = parameters$beta0, 
+#                 beta = matrix(0, 1, 0), 
+#                 gamma = parameters$gamma, 
+#                 covariates = list(), 
+#                 short_range = parameters$short_range, 
+#                 medium_range = parameters$medium_range, 
+#                 long_range = parameters$long_range, 
+#                 saturation = saturation) 
 ```
 
 And as previously, we draw from the model.
 
 ```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
                        model = model,
                        medium_range_model = medium_range_model,
-                       short_range = fit$best_short, 
-                       medium_range = fit$best_medium, 
-                       long_range = fit$best_long, 
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
                        types = levels(types(configuration)),
                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
-                       steps = 10000000)
+                       saturation = saturation,
+                       steps = steps)
 print(draw)
 
 par(mar = c(5, 4, 4, 13) + 0.1)
 plot(draw, window = window)
 ```
 
-# Comparison to classical Hard-core model.
+And let us also plot the K function.
 
 ```{r}
-configuration <- Configuration(spruces$x, spruces$y)
-model <- "Geyer"
-medium_range_model <- "Geyer"
-```
-
-We call the fitting function on this unmarked point process.
-
-```{r}
-fit <- ppjsdm::gibbsm(configuration, 
-                      window = window, 
-                      model = model,
-                      medium_range_model = medium_range_model,
-                      short_range = short_range,
-                      medium_range = medium_range,
-                      long_range = long_range,
-                      use_glmnet = TRUE,
-                      use_aic = TRUE,
-                      saturation = 1)
-plot(fit$complete)
-print(fit$coefficients)
-print(fit$best_short)
-print(fit$best_medium)
-print(fit$best_long)
-print(fit$aic)
-print(fit$bic)
-```
-
-We may then plot the corresponding Papangelou conditional intensity.
-
-```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-plot_papangelou(window = window,
-                configuration = configuration,
-                type = 1, 
-                mark = mean(get_marks(configuration)),
-                model = model, 
-                medium_range_model = medium_range_model, 
-                alpha = alpha, 
-                lambda = lambda, 
-                beta = matrix(0, 1, 0), 
-                gamma = gamma, 
-                covariates = list(), 
-                short_range = fit$best_short, 
-                medium_range = fit$best_medium, 
-                long_range = fit$best_long, 
-                saturation = 1) 
-```
-
-And as previously, we draw from the model.
-
-```{r}
-parameters <- get_parameters_from_fit(fit)
-lambda <- parameters$lambda
-alpha <- parameters$alpha
-gamma <- parameters$gamma
-draw <- ppjsdm::rgibbs(window = window, 
-                       alpha = alpha, 
-                       lambda = lambda, 
-                       gamma = gamma,
+env <- envelope.ppp(ppp(configuration$x, configuration$y, window = spatstat_window), simulate = function(X) {
+  z <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
                        model = model,
                        medium_range_model = medium_range_model,
-                       short_range = fit$best_short, 
-                       medium_range = fit$best_medium, 
-                       long_range = fit$best_long, 
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
                        types = levels(types(configuration)),
                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
-                       steps = 10000000)
-print(draw)
-
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(draw, window = window)
+                       saturation = saturation,
+                       steps = steps)
+  ppp(z$x, z$y, window = spatstat_window)
+  })
+plot(env)
 ```
+
+<!-- # Comparison to classical Hard-core model. -->
+
+<!-- ```{r} -->
+<!-- configuration <- Configuration(spruces$x, spruces$y) -->
+<!-- model <- "Geyer" -->
+<!-- medium_range_model <- "Geyer" -->
+<!-- ``` -->
+
+<!-- We call the fitting function on this unmarked point process. -->
+
+<!-- ```{r} -->
+<!-- fit <- ppjsdm::gibbsm(configuration,  -->
+<!--                       window = window,  -->
+<!--                       model = model, -->
+<!--                       medium_range_model = medium_range_model, -->
+<!--                       short_range = short_range, -->
+<!--                       medium_range = medium_range, -->
+<!--                       long_range = long_range, -->
+<!--                       use_glmnet = FALSE, -->
+<!--                       use_aic = TRUE, -->
+<!--                       saturation = saturation) -->
+<!-- print(summary(fit)) -->
+<!-- print(fit$coefficients) -->
+<!-- print(fit$aic) -->
+<!-- print(fit$bic) -->
+<!-- ``` -->
+
+<!-- We may then plot the corresponding Papangelou conditional intensity. -->
+
+<!-- ```{r} -->
+<!-- parameters <- fit$coefficients -->
+<!-- # plot_papangelou(window = window, -->
+<!-- #                 configuration = configuration, -->
+<!-- #                 type = 1,  -->
+<!-- #                 mark = mean(get_marks(configuration)), -->
+<!-- #                 model = model,  -->
+<!-- #                 medium_range_model = medium_range_model,  -->
+<!-- #                 alpha = parameters$alpha,  -->
+<!-- #                 beta0 = parameters$beta0,  -->
+<!-- #                 beta = matrix(0, 1, 0),  -->
+<!-- #                 gamma = parameters$gamma,  -->
+<!-- #                 covariates = list(),  -->
+<!-- #                 short_range = parameters$short_range,  -->
+<!-- #                 medium_range = parameters$medium_range,  -->
+<!-- #                 long_range = parameters$long_range,  -->
+<!-- #                 saturation = saturation)  -->
+<!-- ``` -->
+
+<!-- And as previously, we draw from the model. -->
+
+<!-- ```{r} -->
+<!-- draw <- ppjsdm::rgibbs(window = window, -->
+<!--                        alpha = parameters$alpha, -->
+<!--                        beta0 = parameters$beta0, -->
+<!--                        gamma = parameters$gamma, -->
+<!--                        model = model, -->
+<!--                        medium_range_model = medium_range_model, -->
+<!--                        short_range = parameters$short_range, -->
+<!--                        medium_range = parameters$medium_range, -->
+<!--                        long_range = parameters$long_range, -->
+<!--                        types = levels(types(configuration)), -->
+<!--                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))), -->
+<!--                        saturation = saturation, -->
+<!--                        steps = steps) -->
+<!-- print(draw) -->
+
+<!-- par(mar = c(5, 4, 4, 13) + 0.1) -->
+<!-- plot(draw, window = window) -->
+<!-- ``` -->
+
+<!-- And let us finally plot the K function. -->
+
+<!-- ```{r} -->
+<!-- env <- envelope.ppp(ppp(configuration$x, configuration$y, window = spatstat_window), simulate = function(X) { -->
+<!--   z <- ppjsdm::rgibbs(window = window, -->
+<!--                        alpha = parameters$alpha, -->
+<!--                        beta0 = parameters$beta0, -->
+<!--                        gamma = parameters$gamma, -->
+<!--                        model = model, -->
+<!--                        medium_range_model = medium_range_model, -->
+<!--                        short_range = parameters$short_range, -->
+<!--                        medium_range = parameters$medium_range, -->
+<!--                        long_range = parameters$long_range, -->
+<!--                        types = levels(types(configuration)), -->
+<!--                        mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))), -->
+<!--                        saturation = saturation, -->
+<!--                        steps = steps) -->
+<!--   ppp(z$x, z$y, window = spatstat_window) -->
+<!--   }) -->
+<!-- plot(env) -->
+<!-- ``` -->

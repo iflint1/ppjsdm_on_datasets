@@ -2,10 +2,10 @@ get_nsw <- function(prevalent = 2) {
   vars <- list.files("../data/grids", pattern = ".tif$", full.names = TRUE)
   ibra <- st_read("../data/ibraone.shp", crs = 4283, quiet = TRUE)
   covariates_raster <- stack(vars)
-  crs(covariates_raster) <- CRS("+init=epsg:4283")
+    crs(covariates_raster) <- CRS("+init=epsg:4283")
   
   covariates <- lapply(as.list(covariates_raster), 
-                       function(element) maptools::as.im.RasterLayer(element))
+                         function(element) maptools::as.im.RasterLayer(element))
   names(covariates) <- names(covariates_raster)
   
   window <- covariates[[1]]
