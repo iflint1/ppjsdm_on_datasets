@@ -67,7 +67,7 @@ One could play around with different interaction radii, but any homogeneous inte
 
 ```{r}
 short_range <- matrix(3, number_of_species, number_of_species)
-medium_range <- matrix(3, number_of_species, number_of_species)
+medium_range <- matrix(5, number_of_species, number_of_species)
 long_range <- matrix(10, number_of_species, number_of_species)
 ```
 

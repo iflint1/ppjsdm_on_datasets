@@ -53,11 +53,9 @@ We provide a series of ranges for the interaction radii, and let the fitting fun
 short_range <- c(0, 20)
 medium_range <- c(0, 20)
 long_range <- c(0, 20)
-model <- "square_exponential"
+model <- "exponential"
 medium_range_model <- "square_exponential"
-max_points <- 1000
 saturation <- 2
-steps <- 100000
 ```
 
 We can now call the fitting function.
@@ -70,10 +68,12 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE)
-print(summary(fit))
+                      use_glmnet = FALSE,
+                      saturation = saturation)
+fit_summary <- summary(fit)
+print(fit_summary)
 print(fit$coefficients)
-par(mar=c(5.1, 5.1, 4.1, 4.1))
+par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
 print(fit$aic)

@@ -1,7 +1,6 @@
 # Using `ppjsdm` on datasets.
 
-The aim of this package is to show how to use [`ppjsdm`](https://github.com/iflint1/ppjsdm) on datasets.
-We show here how to use the `ppjsdm` package to work with different types of datatsets.
+The aim of this package is to show how to use [`ppjsdm`](https://github.com/iflint1/ppjsdm) on different types of datatsets.
 
 These datasets come under various licenses, see:
 

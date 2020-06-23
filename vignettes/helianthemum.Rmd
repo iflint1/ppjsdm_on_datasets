@@ -29,7 +29,8 @@ set.seed(1)
 ```
 
 This vignette explains how to use the `ppjsdm` package with the `Helianthemum` dataset from `ecespa`.
-Locations of H. squamatum adult plants and seedlings in a 6 m x 7 m plot over gypsum soil in Chinchón (near Madrid, Spain). These are part of the data collected by Romao (2003) that have been analyzed several times (Escudero et al.2005, De la Cruz 2006, De la Cruz et al. in press. ). 
+Locations of H. squamatum adult plants and seedlings in a 6 m x 7 m plot over gypsum soil in Chinchón (near Madrid, Spain). 
+These are part of the data collected by Romao (2003) that have been analyzed several times (Escudero et al.2005, De la Cruz 2006, De la Cruz et al. in press.). 
 The coordinates of the plans are given in cm.
 
 ```{r}
