@@ -4,6 +4,8 @@ get_bci <- function(least_prevalent = 1, most_prevalent = 2, jitter = .1) {
   
   raw_data <- raw_data[!is.na(raw_data$gx) & !is.na(raw_data$gy), ]
   raw_data <- raw_data[raw_data$status == "A", ]
+  # Remove species with less than 50 individuals
+  raw_data <- raw_data[as.numeric(stats::ave(raw_data$sp, raw_data$sp, FUN = length)) >= 50, ]
 
   sp_prevalence <- rev(sort(table(raw_data$sp)))
   sp_keep <- names(sp_prevalence)[least_prevalent:most_prevalent]

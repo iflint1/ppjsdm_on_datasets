@@ -72,8 +72,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE,
-                      use_aic = TRUE,
+                      fitting_package = "glm",
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
@@ -115,7 +114,7 @@ draw <- ppjsdm::rgibbs(window = window,
                        medium_range = parameters$medium_range,
                        long_range = parameters$long_range,
                        types = levels(types(configuration)),
-                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       mark_range = c(min(ppjsdm::marks(configuration)), max(ppjsdm::marks(configuration))),
                        steps = steps)
 print(draw)
 
@@ -141,8 +140,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE,
-                      use_aic = TRUE,
+                      fitting_package = "glm",
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)

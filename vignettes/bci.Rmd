@@ -34,7 +34,7 @@ This vignette explains how to use the `ppjsdm` package with the Barro Colorado I
 We begin by loading the data with only the most prevalent species.
 
 ```{r}
-number_of_species <- 10
+number_of_species <- 20
 bci <- get_bci(least_prevalent = 50, most_prevalent = 50 + number_of_species - 1)
 configuration <- bci$configuration
 window <- bci$window
@@ -83,7 +83,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE)
+                      fitting_package = "glm")
 print(Sys.time() - tm)
 print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))

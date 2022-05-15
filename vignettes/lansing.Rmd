@@ -69,7 +69,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       short_range = short_range,
                       medium_range = medium_range,
                       long_range = long_range,
-                      use_glmnet = FALSE,
+                      fitting_package = "glm",
                       saturation = saturation)
 # print(summary(fit))
 print(fit$coefficients)

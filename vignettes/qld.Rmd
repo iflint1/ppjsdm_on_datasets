@@ -125,7 +125,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       long_range = long_range,
                       model = model,
                       medium_range_model = medium_range_model,
-                      use_glmnet = FALSE)
+                      fitting_package = "glm")
 print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
