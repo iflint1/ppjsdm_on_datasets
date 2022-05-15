@@ -76,8 +76,6 @@ fit <- ppjsdm::gibbsm(configuration,
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.
@@ -145,8 +143,6 @@ fit <- ppjsdm::gibbsm(configuration,
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.

@@ -70,8 +70,6 @@ print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.

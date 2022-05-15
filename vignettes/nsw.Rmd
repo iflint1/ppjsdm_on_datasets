@@ -61,7 +61,7 @@ The point configuration is plotted below.
 ```{r, fig.height = 4, fig.align = 'center', fig}
 print(configuration)
 par(mar = c(5, 4, 4, 13) + 0.1)
-plot(configuration, window = window)
+plot(configuration)
 ```
 
 The matrix `radii` defined below models interaction radii within a species (on the diagonal), and between species (outside the diagonal).
@@ -91,6 +91,4 @@ print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
-print(fit$aic)
-print(fit$bic)
 ```

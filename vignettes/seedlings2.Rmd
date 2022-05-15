@@ -76,8 +76,6 @@ fit <- ppjsdm::gibbsm(configuration,
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.
@@ -144,8 +142,6 @@ fit <- ppjsdm::gibbsm(configuration,
                       saturation = saturation)
 print(summary(fit))
 print(fit$coefficients)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.
@@ -182,7 +178,7 @@ draw <- ppjsdm::rgibbs(window = window,
                        medium_range = parameters$medium_range,
                        long_range = parameters$long_range,
                        types = levels(types(configuration)),
-                       mark_range = c(min(get_marks(configuration)), max(get_marks(configuration))),
+                       mark_range = c(min(ppjsdm::marks(configuration)), max(ppjsdm::marks(configuration))),
                        steps = steps)
 print(draw)
 

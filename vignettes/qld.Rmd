@@ -65,13 +65,11 @@ fit <- ppjsdm::gibbsm(configuration,
                       medium_range = medium_range,
                       long_range = long_range,
                       window = window, 
-                      use_glmnet = FALSE)
+                      fitting_package = "glm")
 print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
-print(fit$aic)
-print(fit$bic)
 ```
 
 It is then possible to draw from the model, as can be seen below.
@@ -130,8 +128,6 @@ print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
 plot(fit$coefficients$alpha)
 plot(fit$coefficients$gamma)
-print(fit$aic)
-print(fit$bic)
 ```
 
 We may then plot the corresponding Papangelou conditional intensity.
