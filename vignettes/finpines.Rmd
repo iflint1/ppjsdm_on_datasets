@@ -30,6 +30,154 @@ set.seed(1)
 This vignette explains how to use the `ppjsdm` package with the `finpines` dataset from `spatstat`.
 The data record the locations of 126 pine saplings in a Finnish forest, their heights and their diameters.
 
+# Formatting the data
+
+`ppjsdm` works with spatially explicit data.
+There are two basic components needed to run your first fit of the model.
+First, you need to construct a configuration of the studied points, basically a set of their $x$ and $y$ coordinates.
+
+```{r}
+configuration <- ppjsdm::Configuration(finpines$x, finpines$y)
+plot(configuration)
+```
+
+In order to avoid the ``default'' type, you can specify the (unique) species.
+
+```{r}
+configuration <- ppjsdm::Configuration(finpines$x, finpines$y, types = "Pine")
+plot(configuration)
+```
+
+Second, you need to specify the shape of the window where the locations are modelled to occur.
+If you are unsure, a good first guess may be to use the minimum and maximum values of the $x$ and $y$ coordinates, as follows.
+
+```{r}
+window <- ppjsdm::Rectangle_window(c(min(finpines$x), max(finpines$x)), c(min(finpines$y), max(finpines$y)))
+print(window)
+```
+
+In this case, the study window is actually known and can be constructed directly as follows.
+
+```{r}
+window <- ppjsdm::Rectangle_window(c(-5, 5), c(-8, 2))
+print(window)
+```
+
+A more advanced way to specify a window is through `spatstat` `im` objects.
+In short, these are `raster` maps specifying wether a given location is part of the window or not. 
+Using `spatstat`, it is possible to specify a window object from the configuration as follows.
+
+```{r}
+configuration_spatstat <- ppp(x = configuration$x,
+                              y = configuration$y,
+                              window = owin(c(min(configuration$x), max(configuration$x)), 
+                                       c(min(configuration$y), max(configuration$y))))
+window_im <- as.im(Smooth(pixellate(configuration_spatstat, dimyx = c(50, 50)), sigma = 0.4) > 0.02)
+window_im$v[window_im$v == FALSE] <- NA
+plot(window_im)
+points(configuration_spatstat)
+```
+
+This may be useful when you are given a configuration that was not sampled on a rectangular region.
+
+# An elementary fit
+
+With these two basic elements, you can already run a fit of the model. 
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window)
+summary(fit)
+```
+
+The `se_numerical_proportion` column indicates what percent of the standard error is due to numerical uncertainty, due to the distribution and number of dummy (background) points.
+The first step is to bring this down to get more accurate model fits.
+First, you might want to try different distributions.
+Currently, the one that gives the most accurate estimates is the `stratified` distribution.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified")
+summary(fit)
+```
+
+Second, the number of dummy points is controlled through the parameters `max_dummy`, `min_dummy` and `dummy_factor`.
+The final number of dummy points per species is `min(max(N * dummy_factor, min_dummy), max_dummy)`, where `N` is the actual number of points of that species in the dataset.
+One easy way to add more points is to increase `dummy_factor`. 
+For more control, you might want to set `dummy_factor` to a large value, `min_dummy` to 1 and `max_dummy` to the desired number of dummy points in each species.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e3)
+summary(fit)
+
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 2e3)
+summary(fit)
+
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 5e3)
+summary(fit)
+```
+
+By default, `ppjsdm` uses `glmnet` to run a non-regularized fit.
+However, in this case, with too many dummy points, however, `glmnet` starts misbehaving.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4)
+summary(fit)
+```
+
+Note the absurd coefficient estimates.
+In this case, falling back to `glm` works well.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm")
+summary(fit)
+```
+
+The number of dummy points can even be increased further.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e5, fitting_package = "glm")
+summary(fit)
+```
+
+And at this point, the dummy point are responsible for $2\%$ of the standard error which is often good enough.
+
+# Covariates
+
+In this dataset, there are no environmental covariates.
+We nevertheless show here how these could be treated.
+For toy models, specifying the covariates by a mathematical function is often the easiest
+
+```{r}
+covariates <- list(horizontal_gradient = function(x, y) x)
+```
+
+This can be used with `ppjsdm` as follows.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm",
+                      covariates = covariates)
+summary(fit)
+```
+
+In more advanced cases, you might instead have a `raster` object specifying the covariate.
+This has to be converted to the `im` format to be used with `spatstat` and `ppjsdm`.
+The `maptools` package has the nice `as.im.raster` function you can use.
+In our specific case, the horizontal gradient might be converted to `im` easily as follows.
+
+```{r}
+covariates <- list(horizontal_gradient = as.im(function(x, y) x, W = owin(c(-5, 5), c(-8, 2))))
+plot(covariates$horizontal_gradient)
+```
+
+And again, fitting is done in the same way.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm",
+                      covariates = covariates)
+summary(fit)
+```
+
 # Taking marks into account
 
 If marks are provided, the interaction radii are proportional to the marks.
@@ -51,12 +199,11 @@ plot(configuration, window = window)
 We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
 
 ```{r}
-short_range <- c(0, 20)
-medium_range <- c(0, 20)
-long_range <- c(0, 20)
+short_range <- 0.1
+medium_range <- 0.2
+long_range <- 0.4
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
-max_points <- 150
 saturation <- 2
 steps <- 100000
 ```
@@ -75,28 +222,7 @@ fit <- ppjsdm::gibbsm(configuration,
                       fitting_package = "glm")
 print(summary(fit))
 print(fit$coefficients)
-```
-
-We may then plot the corresponding Papangelou conditional intensity.
-
-```{r}
 parameters <- fit$coefficients
-# plot_papangelou(window = window,
-#                 configuration = configuration,
-#                 type = 1, 
-#                 mark = mean(get_marks(configuration)),
-#                 model = model, 
-#                 medium_range_model = medium_range_model, 
-#                 alpha = parameters$alpha, 
-#                 beta0 = parameters$beta0, 
-#                 beta = matrix(0, 1, 0), 
-#                 gamma = parameters$gamma, 
-#                 covariates = list(), 
-#                 short_range = parameters$short_range, 
-#                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
 ```
 
 It is also possible to draw from the model.
@@ -117,7 +243,6 @@ draw <- ppjsdm::rgibbs(window = window,
                        steps = steps)
 print(draw)
 
-par(mar = c(5, 4, 4, 13) + 0.1)
 plot(draw, window = window)
 ```
 
@@ -143,28 +268,8 @@ fit <- ppjsdm::gibbsm(configuration,
                       fitting_package = "glm")
 print(summary(fit))
 print(fit$coefficients)
-```
 
-We may then plot the corresponding Papangelou conditional intensity.
-
-```{r}
 parameters <- fit$coefficients
-# plot_papangelou(window = window,
-#                 configuration = configuration,
-#                 type = 1, 
-#                 mark = mean(get_marks(configuration)),
-#                 model = model, 
-#                 medium_range_model = medium_range_model, 
-#                 alpha = parameters$alpha, 
-#                 lambda = beta0$beta0, 
-#                 beta = matrix(0, 1, 0), 
-#                 gamma = parameters$gamma, 
-#                 covariates = list(), 
-#                 short_range = parameters$short_range, 
-#                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
 ```
 
 And as previously, we draw from the model.
