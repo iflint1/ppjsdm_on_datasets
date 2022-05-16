@@ -41,7 +41,7 @@ configuration <- ppjsdm::Configuration(finpines$x, finpines$y)
 plot(configuration)
 ```
 
-In order to avoid the ``default'' type, you can specify the (unique) species.
+In order to avoid the ``default" type, you can specify the (unique) species.
 
 ```{r}
 configuration <- ppjsdm::Configuration(finpines$x, finpines$y, types = "Pine")
@@ -52,7 +52,8 @@ Second, you need to specify the shape of the window where the locations are mode
 If you are unsure, a good first guess may be to use the minimum and maximum values of the $x$ and $y$ coordinates, as follows.
 
 ```{r}
-window <- ppjsdm::Rectangle_window(c(min(finpines$x), max(finpines$x)), c(min(finpines$y), max(finpines$y)))
+window <- ppjsdm::Rectangle_window(c(min(finpines$x), max(finpines$x)), 
+                                   c(min(finpines$y), max(finpines$y)))
 print(window)
 ```
 
@@ -70,56 +71,83 @@ Using `spatstat`, it is possible to specify a window object from the configurati
 ```{r}
 configuration_spatstat <- ppp(x = configuration$x,
                               y = configuration$y,
-                              window = owin(c(min(configuration$x), max(configuration$x)), 
-                                       c(min(configuration$y), max(configuration$y))))
-window_im <- as.im(Smooth(pixellate(configuration_spatstat, dimyx = c(50, 50)), sigma = 0.4) > 0.02)
+                              window = owin(c(min(configuration$x), 
+                                              max(configuration$x)), 
+                                            c(min(configuration$y), 
+                                              max(configuration$y))))
+window_im <- as.im(Smooth(pixellate(configuration_spatstat, dimyx = c(50, 50)), 
+                          sigma = 0.4) > 0.02)
 window_im$v[window_im$v == FALSE] <- NA
 plot(window_im)
 points(configuration_spatstat)
 ```
 
-This may be useful when you are given a configuration that was not sampled on a rectangular region.
+Here the window is in orange. 
+Note, you should not generally construct a window in this way, unless you know that areas have not been sampled.
+It is useful as a last resort, or when fitting a point process over a large extent where you are not entirely sure which areas have been sampled, but due to the sampled locations you suspect that it has not been homogeneously surveyed.
 
 # An elementary fit
 
-With these two basic elements, you can already run a fit of the model. 
+With these two basic elements, you can already run a fit of the saturated pairwise interaction Gibbs point process.
 
 ```{r}
 fit <- ppjsdm::gibbsm(configuration, window = window)
 summary(fit)
 ```
 
-The `se_numerical_proportion` column indicates what percent of the standard error is due to numerical uncertainty, due to the distribution and number of dummy (background) points.
+Recall the parameters of interest are $\beta_0$ (intercept), $\beta$ (response to the environemntal covariates), $\alpha$ (short-range interaction coefficients) and $\gamma$ (medium-range interaction coefficients). 
+By default, the model does not include medium-range interactions, and we shall see later on how to add them.
+There are no $\beta$ coefficients since we have not (yet) included any environmental covariates.
+
+In the `summary` of the fit above, the `se_numerical_proportion` column indicates what percent of the standard error is due to numerical uncertainty, due to the distribution and number of dummy points.
+In our model, dummy points are the analogue of what other models (e.g., Maxent) call background points.
 The first step is to bring this down to get more accurate model fits.
 First, you might want to try different distributions.
 Currently, the one that gives the most accurate estimates is the `stratified` distribution.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified")
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified")
 summary(fit)
 ```
 
-Second, the number of dummy points is controlled through the parameters `max_dummy`, `min_dummy` and `dummy_factor`.
+Second, the number of dummy (background) points is controlled through the parameters `max_dummy`, `min_dummy` and `dummy_factor`.
 The final number of dummy points per species is `min(max(N * dummy_factor, min_dummy), max_dummy)`, where `N` is the actual number of points of that species in the dataset.
-One easy way to add more points is to increase `dummy_factor`. 
-For more control, you might want to set `dummy_factor` to a large value, `min_dummy` to 1 and `max_dummy` to the desired number of dummy points in each species.
+The defaults are those recommended by the original authors, and work well in most cases.
+However, these defaults often result in large confidence intervals.
+One easy way to add more dummy points is to increase `dummy_factor`. 
+This is usually the recommended procedure as it draws dummy points in proportion to the actual number of individuals.
+Values ranging from 4 to 20 might be explored, and in short the more dummy points you can draw in a reasonable time, the better.
+For more control, and to facilitate our presentation, we might want to set `dummy_factor` to a large value, `min_dummy` to 1 and `max_dummy` to the desired number of dummy points in each species.
+In this way, the value assigned to `max_dummy` directly gives us the number of dummy points used in the fitting procedure.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e3)
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e3)
 summary(fit)
 
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 2e3)
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 2e3)
 summary(fit)
 
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 5e3)
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 5e3)
 summary(fit)
 ```
 
 By default, `ppjsdm` uses `glmnet` to run a non-regularized fit.
-However, in this case, with too many dummy points, however, `glmnet` starts misbehaving.
+However, in this case, with too many dummy points, `glmnet` starts misbehaving.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4)
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", min_dummy = 1, 
+                      dummy_factor = 1e10, max_dummy = 1e4)
 summary(fit)
 ```
 
@@ -127,18 +155,26 @@ Note the absurd coefficient estimates.
 In this case, falling back to `glm` works well.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm")
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10,
+                      max_dummy = 1e4, fitting_package = "glm")
 summary(fit)
 ```
 
-The number of dummy points can even be increased further.
+The number of dummy points can even be increased further when using `glm`.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e5, fitting_package = "glm")
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e5, fitting_package = "glm")
 summary(fit)
 ```
 
-And at this point, the dummy point are responsible for $2\%$ of the standard error which is often good enough.
+The model can handle many more dummy points, but at this point the dummy process is responsible for less than $2\%$ of the standard error which is often good enough.
+The judgement being made here is how tolerant are you of error in the computation of confidence intervals. 
+Fits with fewer dummy points can be computed more quickly, but for your final analysis it is best to increase the number of dummy points as much as possible.
 
 # Covariates
 
@@ -153,8 +189,10 @@ covariates <- list(horizontal_gradient = function(x, y) x)
 This can be used with `ppjsdm` as follows.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", 
-                      min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm",
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e4, fitting_package = "glm",
                       covariates = covariates)
 summary(fit)
 ```
@@ -165,38 +203,87 @@ The `maptools` package has the nice `as.im.raster` function you can use.
 In our specific case, the horizontal gradient might be converted to `im` easily as follows.
 
 ```{r}
-covariates <- list(horizontal_gradient = as.im(function(x, y) x, W = owin(c(-5, 5), c(-8, 2))))
+covariates <- list(horizontal_gradient = as.im(function(x, y) x, 
+                                               W = owin(c(-5, 5), c(-8, 2))))
 plot(covariates$horizontal_gradient)
 ```
 
 And again, fitting is done in the same way.
 
 ```{r}
-fit <- ppjsdm::gibbsm(configuration, window = window, dummy_distribution = "stratified", 
-                      min_dummy = 1, dummy_factor = 1e10, max_dummy = 1e4, fitting_package = "glm",
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e4, fitting_package = "glm",
                       covariates = covariates)
 summary(fit)
 ```
 
-# Taking marks into account
-
-If marks are provided, the interaction radii are proportional to the marks.
-We begin with that setting, choosing the height (rather than the diameter) as the relevant mark.
+Another common situation is one in which the covariate is specified only at the observed data points.
+So you might have a covariate that looks like the following.
 
 ```{r}
-configuration <- Configuration(finpines$x, finpines$y, marks = finpines$marks$height)
-window <- Rectangle_window(c(-5, 5), c(-8, 2))
+measured_covariate <- runif(length(finpines$x))
 ```
 
-The point configuration is plotted below.
+There are two main ways to convert this into a covariate map.
+First, the values might be interpolated and smoothed.
+In the code below, `sigma` controls the amount of smoothing.
 
-```{r, fig.height = 4, fig.align = 'center', fig}
-print(configuration)
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(configuration, window = window)
+```{r}
+marked_covariate <- ppp(x = finpines$x,
+                        y = finpines$y,
+                        marks = measured_covariate,
+                        window = owin(c(-5, 5), 
+                                      c(-8, 2)))
+
+covariates <- list(measured_covariate = Smooth.ppp(marked_covariate, sigma = 0.5))
+plot(covariates$measured_covariate)
+
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e4, fitting_package = "glm",
+                      covariates = covariates)
+summary(fit)
 ```
 
-We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
+Another option is to use a tesselation rather a smoothing.
+
+```{r}
+tess <- dirichlet(ppp(x = finpines$x,
+                        y = finpines$y,
+                        window = owin(c(-5, 5), 
+                                      c(-8, 2))))
+tesselated_covariate <- as.im(as.function(tess, values = measured_covariate), 
+                              dimyx = c(256, 256))
+plot(tesselated_covariate)
+
+fit <- ppjsdm::gibbsm(configuration, window = window, 
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10, 
+                      max_dummy = 1e4, fitting_package = "glm",
+                      covariates = covariates)
+summary(fit)
+```
+
+# A more elaborate fit
+
+We introduce here medium-range interactions and settle on a shape for the interaction potentials driving interactions within the model.
+To show the choices of potentials, you can run the following commands.
+
+```{r}
+ppjsdm::show_short_range_models()
+
+ppjsdm::show_medium_range_models()
+```
+
+As mentioned previously, in short these influence how quickly and in what way interactions decrease with distance between individuals.
+The potentials `Geyer` and `linear` are quite unrealistic, with hard-coded boundaries and should be avoided if possible.
+Other ones are smooth and differ mostly in their shape.
+By default, the medium-range potential is ignored since we have not yet set medium-range and long-range distances.
+We have also up to now used the defaults for the short-range distance, which is $10%$ of the largest side of the rectangular window.
+Let us try using some more sensible values.
 
 ```{r}
 short_range <- 0.1
@@ -204,8 +291,159 @@ medium_range <- 0.2
 long_range <- 0.4
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
-saturation <- 2
-steps <- 100000
+```
+
+One final parameter that one can explore is the `saturation`, which in short caps the number of possible interactions to that value.
+The default is 2, but in general the larger the value, the better.
+We regularly use values of 2, 4, 10, 20, 50.
+
+```{r}
+saturation <- 10
+```
+
+As in the previous sections, we define a configuration and a window object.
+
+```{r}
+configuration <- ppjsdm::Configuration(finpines$x, finpines$y, types = "Pine")
+window <- ppjsdm::Rectangle_window(c(-5, 5), c(-8, 2))
+```
+
+We call the fitting function on this point process.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = model,
+                      medium_range_model = medium_range_model,
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
+                      saturation = saturation,
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10,
+                      max_dummy = 1e4, fitting_package = "glm")
+print(summary(fit))
+
+parameters <- fit$coefficients
+```
+
+The model is predicting clustering at both short and medium ranges.
+To better understand the fit, there are two steps you usually do after running a fit.
+First, let us have a look at the log-Papangelou conditional intensity.
+
+
+```{r}
+plot_papangelou(window = window,
+                configuration = configuration,
+                model = model,
+                medium_range_model = medium_range_model,
+                alpha = parameters$alpha,
+                beta0 = parameters$beta0,
+                gamma = parameters$gamma,
+                short_range = parameters$short_range,
+                medium_range = parameters$medium_range,
+                long_range = parameters$long_range,
+                use_log = TRUE, # Plot the logarithm instead of the actual conditional intensity
+                saturation = saturation)
+```
+
+So, conditional on the existing locations, the model is predicting increased probabilities of finding new individuals around existing ones.
+This provides some insight what the model is capturing to be the underlying generative process.
+Second, we can draw a single realisation from the model.
+This is controlled by the parameter `steps` which is the number of steps in the Metropolis-Hastings algorithms.
+Setting `steps=0` causes the code run a coupling from the past algorithm instead, this yields exact samples from the target distribution but whether or not it converges in a reasonable time depends on the model.
+In our case, unfortunately the large amonts of clustering cause the coupling from the past algorithm to not converge.
+The number of steps needed for the Metropolis-algorithm to converge depends on the dataset.
+Values of `1e3` are sometimes enough, but more commonly it is best to use at least `1e5` except if the dataset is particularly small (which this one is, luckily).
+
+```{r}
+steps <- 1e4
+```
+
+An additional parameter which is sometimes useful is `starting_configuration`.
+This makes the Metropolis-Hastings algorithm start from a provided configuration.
+A natural candidate is the one we fitted the data to--if indeed our model is working well then the Metropolis-Hastings will be starting from its stationary distribution, leading it to requiring fewer steps.
+Unfortunately, the resulting draw might as a consequence be correlated to the data it was fitted on, which we might sometimes want to avoid.
+We nevertheless use this trick here to avoid lengthy Metropolis-Hastings runs.
+
+```{r}
+draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
+                       types = levels(types(configuration)),
+                       saturation = saturation,
+                       steps = steps,
+                       starting_configuration = configuration)
+print(draw)
+
+plot(draw, window = window)
+```
+
+These draws can then be used to produce envelopes of some summary statistics of interest.
+
+```{r}
+steps <- 1e3
+env <- envelope.ppp(ppp(configuration$x, configuration$y, window = owin(c(-5, 5), c(-8, 2))), nsim = 50, simulate = function(X) {
+  draw <- ppjsdm::rgibbs(window = window,
+                       alpha = parameters$alpha,
+                       beta0 = parameters$beta0,
+                       gamma = parameters$gamma,
+                       model = model,
+                       medium_range_model = medium_range_model,
+                       short_range = parameters$short_range,
+                       medium_range = parameters$medium_range,
+                       long_range = parameters$long_range,
+                       types = levels(types(configuration)),
+                       saturation = saturation,
+                       steps = steps,
+                       starting_configuration = configuration)
+  ppp(draw$x, draw$y, window = owin(c(-5, 5), c(-8, 2)))
+})
+plot(env)
+```
+
+This allows us to do more elaborate model evaluation, in this case noting that the model is capturing spatial clustering well on all scales.
+
+# Taking marks into account
+
+Marks are a technical concept which corresponds to a label which may for example indicate height or DBH, that is attached to each individual in the point process.
+If marks are provided, the interaction radii are assumed to be proportional to the marks.
+We begin with that setting, choosing the height (rather than the diameter) as the relevant mark.
+
+```{r}
+hist(finpines$marks$height)
+```
+
+Therefore, to get roughly the same average value for the interaction distances, these should all be divided by 3.
+
+```{r}
+short_range <- 0.1 / 3
+medium_range <- 0.2 / 3
+long_range <- 0.4 / 3
+```
+
+The interpretation of these quantities is now different. 
+Any two individuals are now assumed to interact at a distance (in meters) of `short_range` times their height.
+So, for example, if each of their heights is three meters, then they are assumed to interact at a short distance of `0.1` meters, and similarly for the medium and long ranges.
+We construct similarly the configuration and corresponding window, except we now have a `marks` parameter.
+
+```{r}
+configuration <- ppjsdm::Configuration(finpines$x, finpines$y, 
+                                       types = "Pine", marks = finpines$marks$height)
+window <- ppjsdm::Rectangle_window(c(-5, 5), c(-8, 2))
+```
+
+The point configuration is plotted below.
+
+```{r, fig.height = 4, fig.align = 'center', fig}
+print(configuration)
+plot(configuration, window = window)
 ```
 
 We can now call the fitting function.
@@ -219,15 +457,37 @@ fit <- ppjsdm::gibbsm(configuration,
                       medium_range = medium_range,
                       long_range = long_range,
                       saturation = saturation,
-                      fitting_package = "glm")
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10,
+                      max_dummy = 1e4, fitting_package = "glm")
 print(summary(fit))
-print(fit$coefficients)
+
 parameters <- fit$coefficients
 ```
 
-It is also possible to draw from the model.
+As in the previous example, it is possible to plot the conditional intensity, except that now it tells us about the probability of finding an individual of a specified mark (here, height) at any given location.
 
 ```{r}
+plot_papangelou(window = window,
+                configuration = configuration,
+                mark = 3, # new parameter
+                model = model,
+                medium_range_model = medium_range_model,
+                alpha = parameters$alpha,
+                beta0 = parameters$beta0,
+                gamma = parameters$gamma,
+                short_range = parameters$short_range,
+                medium_range = parameters$medium_range,
+                long_range = parameters$long_range,
+                use_log = TRUE,
+                saturation = saturation)
+```
+
+We now see that the radii around the interaction individuals differ in size.
+As in the previous case, we can also draw a single realisation of the point process.
+
+```{r}
+steps <- 1e4
 draw <- ppjsdm::rgibbs(window = window,
                        alpha = parameters$alpha,
                        beta0 = parameters$beta0,
@@ -238,58 +498,12 @@ draw <- ppjsdm::rgibbs(window = window,
                        medium_range = parameters$medium_range,
                        long_range = parameters$long_range,
                        types = levels(types(configuration)),
-                       mark_range = c(min(ppjsdm::marks(configuration)), max(ppjsdm::marks(configuration))),
+                       mark_range = c(min(ppjsdm::marks(configuration)), 
+                                      max(ppjsdm::marks(configuration))),
                        saturation = saturation,
+                       starting_configuration = configuration,
                        steps = steps)
 print(draw)
 
-plot(draw, window = window)
-```
-
-# Interaction radii not proportional to marks
-
-In this section, we disregard the height of the saplings, and consider interaction radii in metres.
-
-```{r}
-configuration <- Configuration(finpines$x, finpines$y)
-```
-
-We call the fitting function on this unmarked point process.
-
-```{r}
-fit <- ppjsdm::gibbsm(configuration, 
-                      window = window, 
-                      model = model,
-                      medium_range_model = medium_range_model,
-                      short_range = short_range,
-                      medium_range = medium_range,
-                      long_range = long_range,
-                      saturation = saturation,
-                      fitting_package = "glm")
-print(summary(fit))
-print(fit$coefficients)
-
-parameters <- fit$coefficients
-```
-
-And as previously, we draw from the model.
-
-```{r}
-draw <- ppjsdm::rgibbs(window = window,
-                       alpha = parameters$alpha,
-                       beta0 = parameters$beta0,
-                       gamma = parameters$gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = parameters$short_range,
-                       medium_range = parameters$medium_range,
-                       long_range = parameters$long_range,
-                       types = levels(types(configuration)),
-                       saturation = saturation,
-                       mark_range = c(min(ppjsdm::marks(configuration)), max(ppjsdm::marks(configuration))),
-                       steps = steps)
-print(draw)
-
-par(mar = c(5, 4, 4, 13) + 0.1)
 plot(draw, window = window)
 ```
