@@ -282,17 +282,18 @@ As mentioned previously, in short these influence how quickly and in what way in
 The potentials `Geyer` and `linear` are quite unrealistic, with hard-coded boundaries and should be avoided if possible.
 Other ones are smooth and differ mostly in their shape.
 By default, the medium-range potential is ignored since we have not yet set medium-range and long-range distances.
-We have also up to now used the defaults for the short-range distance, which is $10%$ of the largest side of the rectangular window.
+We have also up to now used the defaults for the short-range distance, which is $10\%$ of the largest side of the rectangular window.
 Let us try using some more sensible values.
 
 ```{r}
-short_range <- 0.1
-medium_range <- 0.2
-long_range <- 0.4
+short_range <- 0.4
+medium_range <- 1.5
+long_range <- 2
 model <- "square_exponential"
 medium_range_model <- "square_exponential"
 ```
-
+These dstances are measured in the same units as those of the coordinates, so, in this case, meters.
+We are therefore assuming that short-range interactions occur for individuals located within 40 cm of one another.
 One final parameter that one can explore is the `saturation`, which in short caps the number of possible interactions to that value.
 The default is 2, but in general the larger the value, the better.
 We regularly use values of 2, 4, 10, 20, 50.
@@ -327,8 +328,9 @@ print(summary(fit))
 parameters <- fit$coefficients
 ```
 
-The model is predicting clustering at both short and medium ranges.
+The model is predicting clustering at short ranges, but has not picked up on any significant interactions at medium ranges.
 To better understand the fit, there are two steps you usually do after running a fit.
+
 First, let us have a look at the log-Papangelou conditional intensity.
 
 
@@ -349,6 +351,7 @@ plot_papangelou(window = window,
 
 So, conditional on the existing locations, the model is predicting increased probabilities of finding new individuals around existing ones.
 This provides some insight what the model is capturing to be the underlying generative process.
+
 Second, we can draw a single realisation from the model.
 This is controlled by the parameter `steps` which is the number of steps in the Metropolis-Hastings algorithms.
 Setting `steps=0` causes the code run a coupling from the past algorithm instead, this yields exact samples from the target distribution but whether or not it converges in a reasonable time depends on the model.
@@ -365,6 +368,7 @@ This makes the Metropolis-Hastings algorithm start from a provided configuration
 A natural candidate is the one we fitted the data to--if indeed our model is working well then the Metropolis-Hastings will be starting from its stationary distribution, leading it to requiring fewer steps.
 Unfortunately, the resulting draw might as a consequence be correlated to the data it was fitted on, which we might sometimes want to avoid.
 We nevertheless use this trick here to avoid lengthy Metropolis-Hastings runs.
+Again, we emphasise that the following code draws a single realisation of the point process with parameters fitted from the data.
 
 ```{r}
 draw <- ppjsdm::rgibbs(window = window,
@@ -386,46 +390,52 @@ plot(draw, window = window)
 ```
 
 These draws can then be used to produce envelopes of some summary statistics of interest.
+Namely, in the following code we consider the the $K$ function.
 
 ```{r}
 steps <- 1e3
-env <- envelope.ppp(ppp(configuration$x, configuration$y, window = owin(c(-5, 5), c(-8, 2))), nsim = 50, simulate = function(X) {
-  draw <- ppjsdm::rgibbs(window = window,
-                       alpha = parameters$alpha,
-                       beta0 = parameters$beta0,
-                       gamma = parameters$gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = parameters$short_range,
-                       medium_range = parameters$medium_range,
-                       long_range = parameters$long_range,
-                       types = levels(types(configuration)),
-                       saturation = saturation,
-                       steps = steps,
-                       starting_configuration = configuration)
-  ppp(draw$x, draw$y, window = owin(c(-5, 5), c(-8, 2)))
-})
+env <- envelope.ppp(ppp(configuration$x, configuration$y, window = owin(c(-5, 5), c(-8, 2))), 
+                    nsim = 50, fun = Kest, simulate = function(X) {
+                      draw <- ppjsdm::rgibbs(window = window,
+                                             alpha = parameters$alpha,
+                                             beta0 = parameters$beta0,
+                                             gamma = parameters$gamma,
+                                             model = model,
+                                             medium_range_model = medium_range_model,
+                                             short_range = parameters$short_range,
+                                             medium_range = parameters$medium_range,
+                                             long_range = parameters$long_range,
+                                             types = levels(types(configuration)),
+                                             saturation = saturation,
+                                             steps = steps,
+                                             starting_configuration = configuration)
+                      ppp(draw$x, draw$y, window = owin(c(-5, 5), c(-8, 2)))
+                    })
 plot(env)
 ```
 
-This allows us to do more elaborate model evaluation, in this case noting that the model is capturing spatial clustering well on all scales.
+The empirical $K$ function $\widehat K_{obs}$ is the one computed from the data.
+The mean $K$ function $\bar K$ is the mean estimate obtained from 50 draws of our fitted model. 
+If the mean $K(r)$ function is above the empirical $K(r)$ function, our model is predicting more clustering than is present in the data, for those values of $r$, and vice versa.
+We find that our model reproduces well the actual observed $K$ function, indicating that the model is capturing spatial clustering well on all scales.
 
 # Taking marks into account
 
 Marks are a technical concept which corresponds to a label which may for example indicate height or DBH, that is attached to each individual in the point process.
-If marks are provided, the interaction radii are assumed to be proportional to the marks.
-We begin with that setting, choosing the height (rather than the diameter) as the relevant mark.
+If marks are provided to `ppjsdm`, the model will assume that the interaction radii are proportional to the marks.
+This might reflect the expectation that larger individuals have larger interaction radii (and this should be tested).
+To illustrate this version of the model, we choose the height (rather than the diameter) as the relevant mark.
 
 ```{r}
 hist(finpines$marks$height)
 ```
 
-Therefore, to get roughly the same average value for the interaction distances, these should all be divided by 3.
+Therefore, since the mean is equal to 3, to get roughly the same average value for the interaction distances, these should all be divided by 3.
 
 ```{r}
-short_range <- 0.1 / 3
-medium_range <- 0.2 / 3
-long_range <- 0.4 / 3
+short_range <- 0.4 / 3
+medium_range <- 1.5 / 3
+long_range <- 2 / 3
 ```
 
 The interpretation of these quantities is now different. 
@@ -465,6 +475,7 @@ print(summary(fit))
 parameters <- fit$coefficients
 ```
 
+Interestingly, there are now statistically significant negative medium-range interactions.
 As in the previous example, it is possible to plot the conditional intensity, except that now it tells us about the probability of finding an individual of a specified mark (here, height) at any given location.
 
 ```{r}
@@ -484,6 +495,7 @@ plot_papangelou(window = window,
 ```
 
 We now see that the radii around the interaction individuals differ in size.
+Note also compared to the previous (unmarked) case that there are mild medium-range negative interactions around each of the individuals.
 As in the previous case, we can also draw a single realisation of the point process.
 
 ```{r}
