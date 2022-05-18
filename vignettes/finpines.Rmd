@@ -371,17 +371,7 @@ We nevertheless use this trick here to avoid lengthy Metropolis-Hastings runs.
 Again, we emphasise that the following code draws a single realisation of the point process with parameters fitted from the data.
 
 ```{r}
-draw <- ppjsdm::rgibbs(window = window,
-                       alpha = parameters$alpha,
-                       beta0 = parameters$beta0,
-                       gamma = parameters$gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = parameters$short_range,
-                       medium_range = parameters$medium_range,
-                       long_range = parameters$long_range,
-                       types = levels(types(configuration)),
-                       saturation = saturation,
+draw <- ppjsdm::rgibbs(fit,
                        steps = steps,
                        starting_configuration = configuration)
 print(draw)
@@ -396,17 +386,7 @@ Namely, in the following code we consider the the $K$ function.
 steps <- 1e3
 env <- envelope.ppp(ppp(configuration$x, configuration$y, window = owin(c(-5, 5), c(-8, 2))), 
                     nsim = 50, fun = Kest, simulate = function(X) {
-                      draw <- ppjsdm::rgibbs(window = window,
-                                             alpha = parameters$alpha,
-                                             beta0 = parameters$beta0,
-                                             gamma = parameters$gamma,
-                                             model = model,
-                                             medium_range_model = medium_range_model,
-                                             short_range = parameters$short_range,
-                                             medium_range = parameters$medium_range,
-                                             long_range = parameters$long_range,
-                                             types = levels(types(configuration)),
-                                             saturation = saturation,
+                      draw <- ppjsdm::rgibbs(fit,
                                              steps = steps,
                                              starting_configuration = configuration)
                       ppp(draw$x, draw$y, window = owin(c(-5, 5), c(-8, 2)))
@@ -500,19 +480,7 @@ As in the previous case, we can also draw a single realisation of the point proc
 
 ```{r}
 steps <- 1e4
-draw <- ppjsdm::rgibbs(window = window,
-                       alpha = parameters$alpha,
-                       beta0 = parameters$beta0,
-                       gamma = parameters$gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = parameters$short_range,
-                       medium_range = parameters$medium_range,
-                       long_range = parameters$long_range,
-                       types = levels(types(configuration)),
-                       mark_range = c(min(ppjsdm::marks(configuration)), 
-                                      max(ppjsdm::marks(configuration))),
-                       saturation = saturation,
+draw <- ppjsdm::rgibbs(fit,
                        starting_configuration = configuration,
                        steps = steps)
 print(draw)
