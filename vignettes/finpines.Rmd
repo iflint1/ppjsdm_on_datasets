@@ -104,12 +104,24 @@ In the `summary` of the fit above, the `se_numerical_proportion` column indicate
 In our model, dummy points are the analogue of what other models (e.g., Maxent) call background points.
 The first step is to bring this down to get more accurate model fits.
 First, you might want to try different distributions.
+By default, the dummy points are distributed uniformly, see below.
+
+```{r}
+plot(fit$data_list$dummy)
+```
+
 Currently, the one that gives the most accurate estimates is the `stratified` distribution.
 
 ```{r}
 fit <- ppjsdm::gibbsm(configuration, window = window, 
                       dummy_distribution = "stratified")
 summary(fit)
+```
+
+This distribution covers space more evenly, and thus produces more accurate estimates.
+
+```{r}
+plot(fit$data_list$dummy)
 ```
 
 Second, the number of dummy (background) points is controlled through the parameters `max_dummy`, `min_dummy` and `dummy_factor`.
