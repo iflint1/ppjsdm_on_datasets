@@ -66,7 +66,7 @@ print(window)
 ```
 
 A more advanced way to specify a window is through `spatstat` `im` objects.
-In short, these are `raster` maps specifying wether a given location is part of the window or not. 
+In short, these are `raster` maps specifying whether a given location is part of the window or not. 
 Using `spatstat`, it is possible to specify a window object from the configuration as follows.
 
 ```{r}
@@ -96,7 +96,7 @@ fit <- ppjsdm::gibbsm(configuration, window = window)
 summary(fit)
 ```
 
-Recall the parameters of interest are $\beta_0$ (intercept), $\beta$ (response to the environemntal covariates), $\alpha$ (short-range interaction coefficients) and $\gamma$ (medium-range interaction coefficients). 
+Recall the parameters of interest are $\beta_0$ (intercept), $\beta$ (response to the environmental covariates), $\alpha$ (short-range interaction coefficients) and $\gamma$ (medium-range interaction coefficients). 
 By default, the model does not include medium-range interactions, and we shall see later on how to add them.
 There are no $\beta$ coefficients since we have not (yet) included any environmental covariates.
 
@@ -294,7 +294,7 @@ model <- "square_exponential"
 medium_range_model <- "square_exponential"
 ```
 These distances are measured in the same units as those of the coordinates, so, in this case, meters.
-We are therefore assuming that short-range interactions occur for individuals located within 40 cm of one another.
+We are therefore assuming that short-range interactions decline to half their maximum strength at 40cm (and continue to decline beyond that).
 One final parameter that one can explore is the `saturation`, which in short caps the number of possible interactions to that value.
 The default is 2, but in general the larger the value, the better.
 We regularly use values of 2, 4, 10, 20, 50.
@@ -403,8 +403,8 @@ We find that our model reproduces well the actual observed $K$ function, indicat
 # Improving the fit
 
 At this point, we have fixed the different parameters, but have not put enough thought into how to choose them.
-There are here two orthogonal aspects: first, one would like to choose potentials and distances which make ecological sense and allow us to make sense of the model's outputs; second, one would like to choose the `best' values in a statistical sense.
-In this section, we focus only on the second aspect, i.e., figuring out which parameters are `best'.
+There are here two orthogonal aspects: first, one would like to choose potentials and distances which make ecological sense and allow us to make sense of the model's outputs; second, one would like to choose the 'best' values in a statistical sense.
+In this section, we focus only on the second aspect, i.e., figuring out which parameters are 'best'.
 `ppjsdm` implements a direct way to find the best interaction radii by specifying ranges for the distances rather than values.
 
 ```{r}
@@ -435,7 +435,7 @@ print(fit$coefficients$medium_range)
 print(fit$coefficients$long_range)
 ```
 
-We discourage the use of `ppjsdm` direct for a few reasons though.
+We discourage the use of `ppjsdm` in this way for a few reasons, though.
 First, the implementation of `gibbsm` in this case is not fully settled and is a bit of a black box currently relying on a genetic algorithm, second it draws new dummy points for each fit making the optimised function random (making resulting interpretation tenuous).
 We rather encourage users to precisely hand-code the optimisation procedures according to their setting and interests.
 In choosing the interaction radii, a good first step is to analyse different summary statistics.
@@ -445,11 +445,11 @@ For example, the pair-correlation function tells us about whether the point proc
 plot(envelope(finpines, fun = pcf))
 ```
 
-We see here that this data is significantly more clustered than a Poisson point process for distances of less than 0.4 m, with another small detected clustering around 0.6 m.
+We see here that these data are significantly more clustered than a Poisson point process for distances of less than 0.4 m, with another small detected clustering around 0.6 m.
 So we might look for interaction distances less than 0.6 m.
 
 In the following code block we remove medium-range interaction distances to first fit the short ranges.
-We optimize by minimising the AIC over the short range for 4 potentials.
+We optimize by minimising the AIC over the short range for 4 differently shaped potentials.
 
 ```{r}
 medium_range <- 0
@@ -486,6 +486,7 @@ The optimal short range is equal to
 df$short[which.min(df$aic[df$potentials == "square_bump"])]
 ```
 
+Recall that this is measured in meters, so we are saying that short-range interactions reach half of their maximum at 17.6 cm.
 We may then fix this value, and search for optimal medium and long ranges (or better yet, optimise over all three jointly).
 To simplify things in this vignette, we impose that the long-range is 50 cm more than the medium range, and we optimise over the medium range only.
 
@@ -559,7 +560,7 @@ Nevertheless, this gives an idea of how we think about choosing the different pa
 
 # Taking marks into account
 
-Marks are a technical concept which corresponds to a label which may for example indicate height or DBH, that is attached to each individual in the point process.
+Marks are a technical concept which corresponds to a label which may for example indicate tree height or DBH, that is attached to each individual in the point process.
 If marks are provided to `ppjsdm`, the model will assume that the interaction radii are proportional to the marks.
 This might reflect the expectation that larger individuals have larger interaction radii (and this should be tested).
 To illustrate this version of the model, we choose the height (rather than the diameter) as the relevant mark.
@@ -633,9 +634,11 @@ plot_papangelou(window = window,
                 saturation = saturation)
 ```
 
-We now see that the radii around the interaction individuals differ in size.
+It is not entirely clear from the figure, but it can be seen that the radii around the different individuals now differ in size.
 Note also compared to the previous (unmarked) case that there are mild medium-range negative interactions around each of the individuals.
 As in the previous case, we can also draw a single realisation of the point process.
+Compared to the previous setting where interaction radii were not assumed to be proportional to tree height, in this case a realisation of the point process comes with a set of marks, in this case tree height.
+This means that the model is jointly simulating tree location as well as tree height.
 
 ```{r}
 steps <- 1e4
@@ -646,3 +649,5 @@ print(draw)
 
 plot(draw, window = window)
 ```
+
+Although a more thorough model evaluation could be done, it is striking how visually similar this is to the actual data, which shows a couple large clumps of tall saplings and a few isolated smaller trees.
