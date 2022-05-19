@@ -20,6 +20,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
+library(ggplot2)
 library(ppjsdm)
 library(spatstat)
 remove(list = ls())
@@ -399,6 +400,163 @@ The mean $K$ function $\bar K$ is the mean estimate obtained from 50 draws of ou
 If the mean $K(r)$ function is above the empirical $K(r)$ function, our model is predicting more clustering than is present in the data, for those values of $r$, and vice versa.
 We find that our model reproduces well the actual observed $K$ function, indicating that the model is capturing spatial clustering well on all scales.
 
+# Improving the fit
+
+At this point, we have fixed the different parameters, but have not put enough thought into how to choose them.
+There are here two orthogonal aspects: first, one would like to choose potentials and distances which make ecological sense and allow us to make sense of the model's outputs; second, one would like to choose the `best' values in a statistical sense.
+In this section, we focus only on the second aspect, i.e., figuring out which parameters are `best'.
+`ppjsdm` implements a direct way to find the best interaction radii by specifying ranges for the distances rather than values.
+
+```{r}
+short_range <- c(0, 1)
+medium_range <- c(0, 2)
+long_range <- c(0, 2)
+```
+
+The ranges actually represent the differences between radii, namely in this case the medium range is assumed to be between 0 and 2 m *more* than the short range.
+We demonstrate the result of running `gibbsm` in this way for a rather small amount of dummy points.
+
+```{r}
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = model,
+                      medium_range_model = medium_range_model,
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
+                      saturation = saturation,
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10,
+                      max_dummy = 500, fitting_package = "glm")
+print(summary(fit))
+
+print(fit$coefficients$short_range)
+print(fit$coefficients$medium_range)
+print(fit$coefficients$long_range)
+```
+
+We discourage the use of `ppjsdm` direct for a few reasons though.
+First, the implementation of `gibbsm` in this case is not fully settled and is a bit of a black box currently relying on a genetic algorithm, second it draws new dummy points for each fit making the optimised function random (making resulting interpretation tenuous).
+We rather encourage users to precisely hand-code the optimisation procedures according to their setting and interests.
+In choosing the interaction radii, a good first step is to analyse different summary statistics.
+For example, the pair-correlation function tells us about whether the point process is more or less clustered than a Poisson point process at different ranges.
+
+```{r}
+plot(envelope(finpines, fun = pcf))
+```
+
+We see here that this data is significantly more clustered than a Poisson point process for distances of less than 0.4 m, with another small detected clustering around 0.6 m.
+So we might look for interaction distances less than 0.6 m.
+
+In the following code block we remove medium-range interaction distances to first fit the short ranges.
+We optimize by minimising the AIC over the short range for 4 potentials.
+
+```{r}
+medium_range <- 0
+long_range <- 0
+to_optimize <- function(df) {
+  sapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = df$model[i],
+                          short_range = df$short[i],
+                          medium_range = medium_range,
+                          long_range = long_range,
+                          saturation = saturation,
+                          dummy_distribution = "stratified", 
+                          min_dummy = 1, dummy_factor = 1e10,
+                          max_dummy = 1e3, fitting_package = "glm")
+    fit$aic
+  })
+}
+possible_short <- seq(from = 0.01, to = 0.5, by = 0.001)
+possible_model <- c("square_exponential", "exponential", "square_bump", "bump")
+df <- expand.grid(short = possible_short, model = possible_model)
+df$aic <- to_optimize(df)
+df$potentials <- df$model
+
+ggplot(df) + geom_point(aes(x = short, y = aic, colour = potentials))
+```
+
+Among those explored, the best potential is found to be the `square_bump` for the short range.
+The optimal short range is equal to
+
+```{r}
+df$short[which.min(df$aic[df$potentials == "square_bump"])]
+```
+
+We may then fix this value, and search for optimal medium and long ranges (or better yet, optimise over all three jointly).
+To simplify things in this vignette, we impose that the long-range is 50 cm more than the medium range, and we optimise over the medium range only.
+
+```{r}
+short_range <- 0.176
+model <- "square_bump"
+to_optimize <- function(df) {
+  sapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = model,
+                          medium_range_model = df$medium_range_model[i],
+                          short_range = short_range,
+                          medium_range = df$medium_range[i],
+                          long_range = df$medium_range[i] + 0.5,
+                          saturation = saturation,
+                          dummy_distribution = "stratified", 
+                          min_dummy = 1, dummy_factor = 1e10,
+                          max_dummy = 1e4, fitting_package = "glm")
+    fit$aic
+  })
+}
+possible_medium_range <- seq(from = short_range, to = short_range + 0.6, by = 0.01)
+possible_model <- c("square_exponential", "exponential", "square_bump", "bump")
+df <- expand.grid(medium_range = possible_medium_range, medium_range_model = possible_model)
+df$aic <- to_optimize(df)
+df$potentials <- df$medium_range_model
+
+ggplot(df) + geom_point(aes(x = medium_range, y = aic, colour = potentials))
+```
+
+In this case, we find the `square_exponential` potential to be best, with a corresponding medium-range interaction radius of
+
+```{r}
+df$medium_range[which.min(df$aic[df$potentials == "square_exponential"])]
+```
+
+We may then run the fit with those values.
+
+```{r}
+short_range <- 0.176
+medium_range <- 0.336
+long_range <- 0.836
+model <- "square_bump"
+medium_range_model <- "square_exponential"
+
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = model,
+                      medium_range_model = medium_range_model,
+                      short_range = short_range,
+                      medium_range = medium_range,
+                      long_range = long_range,
+                      saturation = saturation,
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1, dummy_factor = 1e10,
+                      max_dummy = 1e4, fitting_package = "glm")
+print(summary(fit))
+```
+
+We do not make here the claim that the procedure outlined here is robust. 
+Some issues include:
+
+- we have done a marginal minimisation of the AIC rather than a joint one;
+- there do not appear to be detectable medium-range interactions in this dataset, and thus the minimisation over the medium and long ranges are likely not meaningful;
+- we could use more elaborate optimisation algorithms rather than grid search;
+- the number of background points could be increased.
+
+Nevertheless, this gives an idea of how we think about choosing the different parameters from a statistical point of view.
+
 # Taking marks into account
 
 Marks are a technical concept which corresponds to a label which may for example indicate height or DBH, that is attached to each individual in the point process.
@@ -411,6 +569,7 @@ hist(finpines$marks$height)
 ```
 
 Therefore, since the mean is equal to 3, to get roughly the same average value for the interaction distances, these should all be divided by 3.
+We use in the following values which make a priori sense rather than those derived by statistical optimisation.
 
 ```{r}
 short_range <- 0.4 / 3
