@@ -214,7 +214,7 @@ coef(fit)$alpha
 
 We may then plot the corresponding Papangelou conditional intensity, for example for the second species (swamp tupelo `NS`).
 
-```{r, fig.height = 5, fig.width = 10}
+```{r, fig.height = 5, fig.width = 20}
 plot_papangelou(fit,
                 type = 2,
                 use_log = TRUE,
@@ -225,7 +225,7 @@ This is quite different from the fifth species (bald cypress `TD`)
 This species has negative interactions with all other individuals, including those of its own class.
 The species is indeed more spread out than other species in the dataset.
 
-```{r, fig.height = 5, fig.width = 10}
+```{r, fig.height = 5, fig.width = 20}
 plot_papangelou(fit,
                 type = 5,
                 use_log = TRUE,
@@ -271,7 +271,7 @@ sample <- ppjsdm::rgibbs(fit,
 true_vs_sample <- ppjsdm::Configuration(x = c(only_species$x, sample$x),
                                         y = c(only_species$y, sample$y),
                                         types = c(rep("true", length(only_species$x)), 
-                                                  rep("simulated", length(only_species$x))))
+                                                  rep("simulated", length(sample$x))))
 plot(true_vs_sample)
 ```
 
