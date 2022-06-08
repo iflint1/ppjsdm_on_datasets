@@ -337,8 +337,6 @@ fit <- ppjsdm::gibbsm(configuration,
                       min_dummy = 1, dummy_factor = 1e10,
                       max_dummy = 1e4, fitting_package = "glm")
 print(summary(fit))
-
-parameters <- fit$coefficients
 ```
 
 The model is predicting clustering at short ranges, but has not picked up on any significant interactions at medium ranges.
@@ -346,20 +344,9 @@ To better understand the fit, there are two steps you usually do after running a
 
 First, let us have a look at the log-Papangelou conditional intensity.
 
-
 ```{r}
-plot_papangelou(window = window,
-                configuration = configuration,
-                model = model,
-                medium_range_model = medium_range_model,
-                alpha = parameters$alpha,
-                beta0 = parameters$beta0,
-                gamma = parameters$gamma,
-                short_range = parameters$short_range,
-                medium_range = parameters$medium_range,
-                long_range = parameters$long_range,
-                use_log = TRUE, # Plot the logarithm instead of the actual conditional intensity
-                saturation = saturation)
+plot_papangelou(fit,
+                use_log = TRUE) # Plot the logarithm instead of the actual conditional intensity
 ```
 
 So, conditional on the existing locations, the model is predicting increased probabilities of finding new individuals around existing ones.
@@ -623,27 +610,15 @@ fit <- ppjsdm::gibbsm(configuration,
                       min_dummy = 1, dummy_factor = 1e10,
                       max_dummy = 1e4, fitting_package = "glm")
 print(summary(fit))
-
-parameters <- fit$coefficients
 ```
 
 Interestingly, there are now statistically significant negative medium-range interactions.
 As in the previous example, it is possible to plot the conditional intensity, except that now it tells us about the probability of finding an individual of a specified mark (here, height) at any given location.
 
 ```{r}
-plot_papangelou(window = window,
-                configuration = configuration,
+plot_papangelou(fit,
                 mark = 3, # new parameter
-                model = model,
-                medium_range_model = medium_range_model,
-                alpha = parameters$alpha,
-                beta0 = parameters$beta0,
-                gamma = parameters$gamma,
-                short_range = parameters$short_range,
-                medium_range = parameters$medium_range,
-                long_range = parameters$long_range,
-                use_log = TRUE,
-                saturation = saturation)
+                use_log = TRUE)
 ```
 
 It is not entirely clear from the figure, but it can be seen that the radii around the different individuals now differ in size.
