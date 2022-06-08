@@ -20,15 +20,20 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(ppjsdm)
 library(ecespa)
-library(plot.matrix)
+library(ggplot2)
+library(ppjsdm)
+library(spatstat)
 remove(list = ls())
 
 set.seed(1)
 ```
 
 This vignette explains how to use the `ppjsdm` package with the `swamp` dataset from `ecespa`.
+It involves multiple species and thus assumes that you have already gone through one of the simpler vignettes.
+
+# Formatting the data
+
 Locations and botanical classification of trees in a plot in the Savannah River. 
 Locations are given in metres, rounded to the nearest 0.1 metre. 
 The data come from a 1-ha (200 m x 50 m) plot in the Savannah River Site, South Carolina, USA. 
@@ -36,8 +41,9 @@ The 734 mapped stems included 156 Carolina ash (Fraxinus caroliniana), 215 Water
 We begin by loading the data with all species.
 
 ```{r}
-configuration <- Configuration(swamp$y, swamp$x, swamp$sp)
-window <- Rectangle_window(c(0, 200), c(0, 50))
+configuration <- ppjsdm::Configuration(swamp$y, swamp$x, swamp$sp)
+window <- ppjsdm::Rectangle_window(c(0, 200), c(0, 50))
+nspecies <- length(unique(swamp$sp))
 ```
 
 The point configuration is plotted below.
@@ -47,48 +53,253 @@ par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
 
-We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
-We can then call the fitting function.
+Although we do not have any environmental covariates for this dataset, a horizontal unmeasured covariate is thought to drive the distribution.
 
 ```{r}
-short_range <- c(0, 20)
-medium_range <- c(0, 20)
-long_range <- c(0, 20)
+covariates <- list(horizontal = function(x, y) x / 100)
+```
+
+# A basic fit
+
+We start with a first elementary fit to properly choose the number of dummy points.
+
+```{r}
+short_range <- matrix(5, nspecies, nspecies)
 model <- "exponential"
-medium_range_model <- "square_exponential"
+ndummy <- 5e3
+nthreads <- 4
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
                       model = model,
-                      medium_range_model = medium_range_model,
+                      covariates = covariates,
                       short_range = short_range,
-                      medium_range = medium_range,
-                      long_range = long_range,
-                      fitting_package = "glm")
-fit_summary <- summary(fit)
-print(fit_summary)
-print(fit$coefficients)
-par(mar = c(5.1, 5.1, 4.1, 4.1))
-plot(fit$coefficients$alpha)
-plot(fit$coefficients$gamma)
+                      fitting_package = "glm",
+                      dummy_distribution = "stratified",
+                      min_dummy = ndummy,
+                      nthreads = nthreads,
+                      dummy_factor = 1)
+
+summary(fit)
 ```
 
-We may then plot the corresponding Papangelou conditional intensity.
+# A better fit
+
+Let us first find good choices for the short-range interaction radii.
+We begin by assuming that all species have the same interaction radius.
 
 ```{r}
-# parameters <- fit$coefficients
-# plot_papangelou(window = window,
-#                 configuration = configuration,
-#                 type = 1, 
-#                 model = model, 
-#                 medium_range_model = medium_range_model, 
-#                 alpha = parameters$alpha, 
-#                 lambda = parameters$lambda, 
-#                 beta = matrix(0, 6, 0), 
-#                 gamma = parameters$gamma, 
-#                 covariates = list(), 
-#                 short_range = parameters$short_range, 
-#                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
+ndummy <- 1e3
+nthreads <- 4
+to_optimize <- function(df) {
+  sapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = df$model[i],
+                          covariates = covariates,
+                          short_range = matrix(df$short[i], nspecies, nspecies),
+                          fitting_package = "glm",
+                          dummy_distribution = "stratified",
+                          min_dummy = ndummy,
+                          nthreads = nthreads,
+                          dummy_factor = 1)
+    fit$aic
+  })
+}
+possible_short <- seq(from = 0.5, to = 20, length.out = 50)
+possible_model <- c("square_exponential", "exponential", "square_bump", "bump")
+df <- expand.grid(short = possible_short, model = possible_model)
+df$aic <- to_optimize(df)
+df$potentials <- df$model
+
+ggplot(df) + geom_point(aes(x = short, y = aic, colour = potentials))
 ```
+
+The minimum AIC is attained around 5 meters.
+
+```{r}
+df$short[which.min(df$aic[df$potentials == "exponential"])]
+```
+
+Fixing values of 5 meters for all other interaction radii, is it possible to do better for some species?
+We start from a matrix of interaction radii of 5 meters, and change one of the diagonal coefficients at a time, checking each time if we attain a lower AIC.
+
+```{r}
+ndummy <- 1e3
+nthreads <- 4
+short_range <- matrix(5, nspecies, nspecies)
+model <- "exponential"
+to_optimize <- function(df) {
+  sapply(seq_len(nrow(df)), function(i) {
+    short_range <- short_range
+    short_range[df$sp[i], df$sp[i]] <- df$short[i]
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = model,
+                          covariates = covariates,
+                          short_range = short_range,
+                          fitting_package = "glm",
+                          dummy_distribution = "stratified",
+                          min_dummy = ndummy,
+                          nthreads = nthreads,
+                          dummy_factor = 1)
+    fit$aic
+  })
+}
+possible_short <- seq(from = 0.1, to = 7, length.out = 100)
+possible_species <- seq_len(nspecies)
+df <- expand.grid(short = possible_short, sp = possible_species)
+df$aic <- to_optimize(df)
+df$sp_name <- levels(swamp$sp)[df$sp]
+
+ggplot(df) + geom_point(aes(x = short, y = aic, colour = sp_name))
+```
+
+
+We see here completely different behaviours among the five species.
+The species Bald cypress (`TD`), Carolina ash (`FX`) and the other species class (`OT`) all attain a lower AIC when choosing intra-species interaction radii smaller than 1 meter.
+The other two species interact at larger distances.
+
+This procedure could also be repeated for all pairs of species.
+In addition, here we have fixed some values of the interaction radii, and minimised the AIC by changing one variable at a time.
+This could more rigorously be done jointly, see our manuscript for more details.
+The main insights derived above still hold when doing a joint optimisation.
+We find the following optimal short-range interaction radii.
+
+```{r}
+df$short[which.min(df$aic[df$sp == 1])]
+df$short[which.min(df$aic[df$sp == 2])]
+df$short[which.min(df$aic[df$sp == 3])]
+df$short[which.min(df$aic[df$sp == 4])]
+df$short[which.min(df$aic[df$sp == 5])]
+```
+
+And so we may use the following as the short-range interaction matrix.
+
+```{r}
+short_range <- matrix(5, nspecies, nspecies)
+short_range[1, 1] <- 0.4
+short_range[2, 2] <- 3.8
+short_range[3, 3] <- 6.5
+short_range[4, 4] <- 0.6
+short_range[5, 5] <- 0.4
+```
+
+We can then run another fit of the model, this time increasing the number of dummy points to get the best possible fit.
+
+```{r}
+model <- "exponential"
+ndummy <- 1e5
+nthreads <- 4
+fit <- ppjsdm::gibbsm(configuration, 
+                      window = window, 
+                      model = model,
+                      covariates = covariates,
+                      short_range = short_range,
+                      fitting_package = "glm",
+                      dummy_distribution = "stratified",
+                      min_dummy = ndummy,
+                      nthreads = nthreads,
+                      dummy_factor = 1)
+
+summary(fit)
+```
+
+The short-range interaction coefficients matrix may easily be obtained as 
+
+```{r}
+coef(fit)$alpha
+```
+
+We may then plot the corresponding Papangelou conditional intensity, for example for the second species (swamp tupelo `NS`).
+
+```{r, fig.height = 5, fig.width = 10}
+plot_papangelou(fit,
+                type = 2,
+                use_log = TRUE,
+                grid_steps = c(2000, 500))
+```
+
+This is quite different from the fifth species (bald cypress `TD`)
+This species has negative interactions with all other individuals, including those of its own class.
+The species is indeed more spread out than other species in the dataset.
+
+```{r, fig.height = 5, fig.width = 10}
+plot_papangelou(fit,
+                type = 5,
+                use_log = TRUE,
+                grid_steps = c(2000, 500))
+```
+
+# Model assessment
+
+Let us see how well the model has performed on a specific species, say the water tupelo `NX`.
+We start with a basic inhomogeneous Poisson point process fit.
+
+```{r}
+sp <- "NX"
+spatstat_ppp <- ppp(x = swamp$x[swamp$sp == sp],
+                    y = swamp$y[swamp$sp == sp],
+                    window = owin(c(0, 50), c(0, 200)))
+spatstat_fit <- ppm(spatstat_ppp ~ 1 + y)
+env <- envelope(spatstat_fit, fun = Linhom, nsim = 200, 
+                normpower = 2, leaveoneout = FALSE, verbose = FALSE)
+plot(env)
+```
+
+The Poisson point process is not able to capture the short-range clustering in the species.
+Is our model better able to model this species?
+The `ppjsdm` package is able to simulate one species conditional on the others, conditional on the fitted model.
+To begin answering the question, let us draw one such sample of `NS`, and see how it compares to the actual distribution.
+
+```{r}
+sp <- "NX"
+sp_index <- which(names(coef(fit)$beta0) == sp)
+only_species <- ppjsdm::Configuration(x = swamp$y[swamp$sp == sp], 
+                                      y = swamp$x[swamp$sp == sp],
+                                      types = swamp$sp[swamp$sp == sp])
+everything_except_species <- ppjsdm::Configuration(x = swamp$y[swamp$sp != sp], 
+                                                   y = swamp$x[swamp$sp != sp],
+                                                   types = swamp$sp[swamp$sp != sp])
+
+sample <- ppjsdm::rgibbs(fit,
+                         steps = 1e4, # Number of steps in the Metropolis-Hastings algorithm
+                         starting_configuration = only_species, # Starting configuration in the simulation
+                         only_simulate_these_types = sp_index, # Which species to simulate
+                         conditional_configuration = everything_except_species) # Conditional on these individuals
+true_vs_sample <- ppjsdm::Configuration(x = c(only_species$x, sample$x),
+                                        y = c(only_species$y, sample$y),
+                                        types = c(rep("true", length(only_species$x)), 
+                                                  rep("simulated", length(only_species$x))))
+plot(true_vs_sample)
+```
+
+This looks quite convincing.
+To test how well our model is performing, we need to draw a few of these samples, and compute some summary statistic for each one.
+We can then test whether or not the actual distribution falls within the same range of values as those obtained by simulation.
+In the code below, we use the inhomogeneous $L$-function.
+
+```{r}
+nsim <- 50
+samples <- lapply(seq_len(nsim), function(i) {
+  ppjsdm::rgibbs(fit,
+                 steps = 1e4,
+                 starting_configuration = only_species,
+                 only_simulate_these_types = sp_index,
+                 conditional_configuration = everything_except_species)
+})
+
+samples <- lapply(samples, function(x) ppp(x = x$x, y = x$y, window = owin(c(0, 200), c(0, 50))))
+
+only_species_ppp <- ppp(x = swamp$y[swamp$sp == sp], 
+                        y = swamp$x[swamp$sp == sp],
+                        window = owin(c(0, 200), c(0, 50)))
+env <- envelope(only_species_ppp, fun = Linhom, nsim = length(samples), 
+                normpower = 2, leaveoneout = FALSE, simulate = samples, verbose = FALSE)
+plot(env)
+abline(a = 0, b = 1, col = "blue")
+```
+
+The results look much better!
+The model has properly modeled the conditional distribution of the water tupelo.
