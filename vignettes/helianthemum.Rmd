@@ -20,10 +20,9 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
+library(ggplot2)
 library(ppjsdm)
 library(ecespa)
-library(plot.matrix)
-remove(list = ls())
 
 set.seed(1)
 ```
@@ -34,7 +33,14 @@ These are part of the data collected by Romao (2003) that have been analyzed sev
 The coordinates of the plans are given in cm.
 
 ```{r}
-configuration <- Configuration(Helianthemum)
+# Remove duplicate points
+df <- unique(data.frame(x = Helianthemum$x,
+                        y = Helianthemum$y,
+                        types = Helianthemum$marks))
+levels(df$types)[levels(df$types) == "adultHS"] <- "adult"
+levels(df$types)[levels(df$types) == "deadpl"] <- "dead"
+levels(df$types)[levels(df$types) == "survpl"] <- "alive"
+configuration <- Configuration(x = df$x, y = df$y, types = df$types)
 window <- Rectangle_window(c(2, 600), c(2, 699))
 ```
 
@@ -42,81 +48,303 @@ The point configuration is plotted below.
 
 ```{r, fig.height = 4, fig.align = 'center', fig}
 print(configuration)
-par(mar = c(5, 4, 4, 13) + 0.1)
 plot(configuration, window = window)
 ```
 
-We provide a series of ranges for the interaction radii, and let the fitting function calibrate the model.
+In this vignette, we shall explain how one might choose the right interaction potentials.
+
+# Decomposing the potential into Geyer potentials
+
+Geyer potentials are so-called hard-core potentials.
+They allow us to reconstruct the true potential in terms of step functions.
+In order to demonstrate the technique, we search below for interactions in terms of multiple Geyer potentials.
 
 ```{r}
-short_range <- c(0, 50)
-medium_range <- c(0, 50)
-long_range <- c(0, 50)
-model <- "Geyer"
-medium_range_model <- "Geyer"
-saturation <- 2
-max_points <- 1000
-steps <- 100000
+steps <- 4 # Total number of Geyer potentials
+nspecies <- nlevels(configuration$types)
+fit <- gibbsm(configuration,
+              window = window, 
+              saturation = 50,
+              fitting_package = "glm",
+              dummy_distribution = "stratified",
+              min_dummy = 5e4, 
+              model = rep("Geyer", steps), # We want each of the potentials to be a Geyer potential,
+                                           # with corresponding distance varying between 0 and 50 cm, see below.
+              short_range = lapply(seq(from = 0, to = 50, length.out = steps + 1)[-1], 
+                                   function(i) matrix(i, nspecies, nspecies)))
+
+plot(potentials(fit, "adult", "adult"))
+plot(potentials(fit, "dead", "dead"))
+plot(potentials(fit, "alive", "alive"))
+
+plot(potentials(fit, "adult", "alive"))
+plot(potentials(fit, "adult", "dead"))
+plot(potentials(fit, "alive", "dead"))
 ```
 
-We can now call the fitting function.
+```{r}
+nspecies <- nlevels(configuration$types)
+fit <- gibbsm(configuration,
+              window = window, 
+              saturation = 10,
+              fitting_package = "glm",
+              dummy_distribution = "stratified",
+              min_dummy = 5e4, 
+              model = list("exponential", "square_exponential"),
+              short_range = list(matrix(5, nspecies, nspecies),
+                                 matrix(50, nspecies, nspecies)))
+summary(fit)
+plot(potentials(fit, 1, 1))
+plot(potentials(fit, 2, 2))
+plot(potentials(fit, 3, 3))
+
+plot(potentials(fit, 1, 2))
+plot(potentials(fit, 1, 3))
+plot(potentials(fit, 2, 3))
+```
+
+# Minimising AIC
 
 ```{r}
+saturation <- 10
+nsteps <- 20
+nspecies <- nlevels(configuration$types)
+maxr <- 200
+to_optimize <- function(df) {
+  lapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    sh1 <- matrix(df$short_range[i], nspecies, nspecies)
+    colnames(sh1) <- rownames(sh1) <- levels(configuration$types)
+    sh1["adult", "adult"] <- df$adult_short_range[i]
+    
+    sh2 <- matrix(df$medium_range[i], nspecies, nspecies)
+    colnames(sh2) <- rownames(sh2) <- levels(configuration$types)
+    sh2["adult", "adult"] <- df$adult_short_range[i]
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = list(df$model[i], df$medium_range_model[i]),
+                          short_range = list(sh1, sh2),
+                          saturation = saturation,
+                          nthreads = 4,
+                          dummy_distribution = "stratified", 
+                          min_dummy = 500, fitting_package = "glm")
+    list(aic = fit$aic, 
+         alpha1 = fit$coefficients$alpha[[1]], 
+         alpha2 = fit$coefficients$alpha[[2]])
+  })
+}
+possible_adult_short_range <- seq(from = 0, to = maxr, length.out = nsteps + 1)[-1]
+possible_short_range <- seq(from = 0, to = maxr, length.out = nsteps + 1)[-1]
+
+possible_adult_medium_range <- seq(from = 0, to = maxr, length.out = nsteps + 1)[-1]
+possible_medium_range <- seq(from = 0, to = maxr, length.out = nsteps + 1)[-1]
+possible_model <- c("bump")
+possible_medium_range_model <- c("square_exponential")
+df <- expand.grid(short_range = possible_short_range,
+                  adult_short_range = possible_adult_short_range,
+                  medium_range = possible_medium_range, 
+                  adult_medium_range = possible_adult_medium_range,
+                  model = possible_model,
+                  medium_range_model = possible_medium_range_model)
+df <- df[df$short_range <= df$medium_range, ]
+ret <- to_optimize(df)
+
+plot_for_two_species <- function(sp1, sp2) {
+  df$aic <- sapply(ret, function(r) r$aic)
+  df$alpha1 <- sapply(ret, function(r) r$alpha1[sp1, sp2])
+  df$alpha2 <- sapply(ret, function(r) r$alpha2[sp1, sp2])
+  
+  df <- df[order(df$aic), ]
+  
+  x <- seq(from = 0, to = maxr, length.out = 1e3)
+  g <- ggplot() + 
+    geom_line(aes(x = x, y = 0), colour = "red") +
+    theme_minimal() +
+    xlab(NULL) +
+    ylab(NULL) +
+    theme(legend.title = element_blank())
+  ntot <- 20
+  
+  for(i in seq_len(ntot)) {
+    sh1 <- matrix(df[i, ]$short_range, nspecies, nspecies)
+    colnames(sh1) <- rownames(sh1) <- levels(configuration$types)
+    sh1["adult", "adult"] <- df[i, ]$adult_short_range
+    
+    sh2 <- matrix(df[i, ]$medium_range, nspecies, nspecies)
+    colnames(sh2) <- rownames(sh2) <- levels(configuration$types)
+    sh2["adult", "adult"] <- df[i, ]$adult_medium_range
+    
+    short_range <- sh1[sp1, sp2]
+    medium_range <- sh2[sp1, sp2]
+    potential <- function(model, r) {
+      if(model == "square_bump") {
+        function(x) 1 - exp(-r * r * log(2) / (x * x))
+      } else if(model == "square_exponential") {
+        function(x) exp(-x^2 * log(2) / (r * r))
+      } else if(model == "bump") {
+        function(x) 1 - exp(-r * log(2) / x)
+      } else if(model == "exponential") {
+        function(x) exp(-x * log(2) / r)
+      }
+    }
+    assign(paste0("dat", i), data.frame(x = x, 
+                                        short = df$alpha1[i] * potential(df[i, ]$model, r = short_range)(x),
+                                        medium = df$alpha2[i] * potential(df[i, ]$medium_range_model, r = medium_range)(x),
+                                        total = df$alpha1[i] * potential(df[i, ]$model, r = short_range)(x) + 
+                                          df$alpha2[i] * potential(df[i, ]$medium_range_model, r = medium_range)(x)))
+    g <- g +
+      geom_line(data = get(paste0("dat", i)), aes(x = x, y = total, colour = "Total"), size = 1, alpha = 0.8 - 0.6 * i / ntot) +
+      geom_line(data = get(paste0("dat", i)), aes(x = x, y = short, colour = "Short"), alpha = 0.2) +
+      geom_line(data = get(paste0("dat", i)), aes(x = x, y = medium, colour = "Medium"), alpha = 0.2)
+  }
+  g
+}
+plot_for_two_species("adult", "adult")
+plot_for_two_species("dead", "dead")
+plot_for_two_species("alive", "alive")
+
+plot_for_two_species("adult", "alive")
+plot_for_two_species("adult", "dead")
+plot_for_two_species("alive", "dead")
+```
+
+
+```{r}
+configuration_ppp <- ppp(x = configuration$x,
+                         y = configuration$y,
+                         window = owin(window$x_range, window$y_range),
+                         marks = configuration$types)
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "adult", j = "adult", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "alive", j = "alive", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "dead", j = "dead", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "adult", j = "alive", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "adult", j = "dead", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+
+plot(envelope(configuration_ppp, fun = pcfcross, i = "alive", j = "dead", normpower = 2, r = seq(from = 0, to = 200, length.out = 1e4), nsim = 200), ylim = c(0, 10))
+```
+
+```{r}
+saturation <- 50
+dummy_factor <- 4
+nspecies <- nlevels(configuration$types)
+
+# Optimisation functions work with a function of a series of parameters,
+# function below converts back to matrix form
+npar <- 10
+par_to_matrix <- function(par) {
+  # Avoid invalid values of the parameters, while preserving continuity
+  par <- abs(par)
+  
+  # Coeff used to avoid same values for medium and short ranges, leads to degenerate results
+  # especially when both potentials have the same shape
+  coef <- 1.1
+  
+  sh1 <- matrix(par[1], nspecies, nspecies)
+  colnames(sh1) <- rownames(sh1) <- levels(configuration$types)
+      
+  sh2 <- matrix(coef * par[1] + par[2], nspecies, nspecies)
+  colnames(sh2) <- rownames(sh2) <- levels(configuration$types)
+  
+  sh1["adult", "adult"] <- par[3]
+  sh2["adult", "adult"] <- coef * par[3] + par[4]
+  
+  sh1["dead", "dead"] <- sh1["alive", "alive"] <- par[5]
+  sh2["dead", "dead"] <- sh2["alive", "alive"] <- coef * par[5] + par[6]
+  
+  sh1["adult", "alive"] <- sh1["alive", "adult"] <- par[7]
+  sh2["adult", "alive"] <- sh2["alive", "adult"] <- coef * par[7] + par[8]
+  
+  sh1["adult", "dead"] <- sh1["dead", "adult"] <- par[9]
+  sh2["adult", "dead"] <- sh2["dead", "adult"] <- coef * par[9] + par[10]
+  
+  list(sh1, sh2)
+}
+
+to_minimise <- function(par, model, medium_range_model) {
+  set.seed(1)
+  tryCatch(
+  {
+    ppjsdm::gibbsm(configuration, 
+                   window = window, 
+                   model = list(model, medium_range_model),
+                   short_range = par_to_matrix(par),
+                   saturation = saturation,
+                   nthreads = 4,
+                   dummy_distribution = "stratified", 
+                   dummy_factor = dummy_factor, 
+                   fitting_package = "glm")$aic
+  }, warning = function(w) {
+    1e10
+  })
+}
+
+possible_model <- c("bump", "exponential", "square_bump", "square_exponential")
+possible_medium_range_model <- c("bump", "exponential", "square_bump", "square_exponential")
+models <- expand.grid(model = possible_model,
+                      medium_range_model = possible_medium_range_model)
+# models <- models[!duplicated(t(apply(models, 1, sort))), ]
+
+tm <- Sys.time()
+opts <- lapply(seq_len(nrow(models)), function(i) {
+  # Get initial guess by drawing 100 quasi-random draws
+  draws <- abs(15 + 10 * randtoolbox::sobol(100, dim = npar, normal = TRUE))
+  z <- lapply(seq_len(nrow(draws)), function(j) {
+    set.seed(j)
+    par <- draws[j, ]
+    m <- to_minimise(par, model = models$model[i], medium_range_model = models$medium_range_model[i])
+    list(par = par, min = m)
+  })
+  
+  # Figure out which one of the draws was best
+  best <- which.min(sapply(z, function(x) x$m))
+  
+  # And use that to initialise the optim call
+  optim(par = z[[best]]$par, 
+        fn = to_minimise, 
+        method = "L-BFGS", # Try BFGS? CG? Nelder–Mead?
+        control = list(maxit = 30000),
+        model = models$model[i],
+        lower = rep(0, npar),
+        upper = rep(100, npar),
+        medium_range_model = models$medium_range_model[i])
+})
+Sys.time() - tm
+
+best_opt <- order(sapply(opts, function(o) o$value))[1]
+model <- models$model[best_opt]
+medium_range_model <- models$medium_range_model[best_opt]
+opt <- opts[[best_opt]]
+
+set.seed(1)
 fit <- ppjsdm::gibbsm(configuration, 
                       window = window, 
-                      model = model,
-                      medium_range_model = medium_range_model,
-                      short_range = short_range,
-                      medium_range = medium_range,
-                      long_range = long_range,
-                      fitting_package = "glm",
-                      saturation = saturation)
-print(summary(fit))
-print(fit$coefficients)
-par(mar=c(5.1, 5.1, 4.1, 4.1))
-plot(fit$coefficients$alpha)
-plot(fit$coefficients$gamma)
+                      model = list(model, medium_range_model),
+                      short_range = par_to_matrix(opt$par),
+                      saturation = saturation,
+                      nthreads = 4,
+                      dummy_distribution = "stratified", 
+                      min_dummy = 1e5, fitting_package = "glm")
+plot(potentials(fit, "adult", "adult"))
+plot(potentials(fit, "alive", "alive"))
+plot(potentials(fit, "dead", "dead"))
+
+plot(potentials(fit, "adult", "alive"))
+plot(potentials(fit, "adult", "dead"))
+plot(potentials(fit, "alive", "dead"))
 ```
 
-We may then plot the corresponding Papangelou conditional intensity.
-
-```{r}
-parameters <- fit$coefficients
-# plot_papangelou(window = window,
-#                 configuration = configuration,
-#                 type = 1, 
-#                 mark = mean(get_marks(configuration)),
-#                 model = model, 
-#                 medium_range_model = medium_range_model, 
-#                 alpha = parameters$alpha, 
-#                 beta0 = parameters$beta0, 
-#                 beta = matrix(0, 1, 0), 
-#                 gamma = parameters$gamma, 
-#                 covariates = list(), 
-#                 short_range = parameters$short_range, 
-#                 medium_range = parameters$medium_range, 
-#                 long_range = parameters$long_range, 
-#                 saturation = saturation,
-#                 max_points = max_points) 
-```
-
-It is also possible to draw from the model.
-
-```{r}
-draw <- ppjsdm::rgibbs(window = window,
-                       alpha = parameters$alpha,
-                       beta0 = parameters$beta0,
-                       gamma = parameters$gamma,
-                       model = model,
-                       medium_range_model = medium_range_model,
-                       short_range = parameters$short_range,
-                       medium_range = parameters$medium_range,
-                       long_range = parameters$long_range,
-                       types = levels(types(configuration)),
-                       mark_range = c(min(ppjsdm::marks(configuration)), max(ppjsdm::marks(configuration))),
-                       steps = steps)
-print(draw)
-
-par(mar = c(5, 4, 4, 13) + 0.1)
-plot(draw, window = window)
+```{r, fig.height = 10, fig.width = 10}
+nsim <- 8
+steps <- 1e5
+draws <- ppjsdm::rgibbs(fit, nsim = nsim, steps = steps, starting_configuration = configuration)
+plots <- lapply(draws, plot)
+plots[[length(plots) + 1]] <- plot(configuration)
+indices <- sample(seq_len(length(plots)))
+cowplot::plot_grid(plotlist = plots[indices])
+which(indices == length(indices))
 ```

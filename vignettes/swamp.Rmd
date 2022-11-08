@@ -186,6 +186,36 @@ short_range[4, 4] <- 0.6
 short_range[5, 5] <- 0.4
 ```
 
+Finally, let us see how the quality of the fit changes with the saturation parameter.
+
+```{r}
+ndummy <- 1e4
+nthreads <- 4
+model <- "exponential"
+to_optimize <- function(df) {
+  sapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = model,
+                          covariates = covariates,
+                          short_range = short_range,
+                          fitting_package = "glm",
+                          dummy_distribution = "stratified",
+                          min_dummy = ndummy,
+                          nthreads = nthreads,
+                          saturation = df$saturation[i],
+                          dummy_factor = 1)
+    fit$aic
+  })
+}
+possible_saturation <- seq(from = 1, to = 20, by = 1)
+df <- expand.grid(saturation = possible_saturation)
+df$aic <- to_optimize(df)
+
+ggplot(df) + geom_point(aes(x = saturation, y = aic))
+```
+
 We can then run another fit of the model, this time increasing the number of dummy points to get the best possible fit.
 
 ```{r}
@@ -234,11 +264,68 @@ plot_papangelou(fit,
 
 # Model assessment
 
+We look at model performance from two points of view.
+First, we show that the conditional intensity of one species conditional on others matches the actual species' distribution.
+Second, we explore how well the model capture the spatial clustering of the different species.
+
+## Conditional intensity
+
+Let us see how well the model has modeled the intensity of a given species, conditional on others.
+To do this, we first construct the configuration of individuals that do not belong to the target species.
+
+```{r, fig.height = 5, fig.width = 20}
+sp <- "TD"
+sp_index <- which(names(coef(fit)$beta0) == sp)
+others <- ppjsdm::Configuration(x = configuration$x[configuration$types != sp],
+                                y = configuration$y[configuration$types != sp],
+                                types = configuration$types[configuration$types != sp])
+plot_papangelou(fit,
+                configuration = others,
+                type = sp_index,
+                use_log = TRUE,
+                grid_steps = c(2000, 500))
+```
+
+The AUC of the conditional prediction can be computed as follows.
+
+```{r}
+sp <- "NS"
+sp_index <- which(names(coef(fit)$beta0) == sp)
+others <- ppjsdm::Configuration(x = configuration$x[configuration$types != sp],
+                                y = configuration$y[configuration$types != sp],
+                                types = configuration$types[configuration$types != sp])
+ret <- plot_papangelou(fit,
+                       configuration = others,
+                       type = sp_index,
+                       grid_steps = c(2000, 500),
+                       return_papangelou = TRUE)
+
+restricted_window <- owin(c(10, 190), c(10, 40))
+restrict <- ret[restricted_window]
+
+cc <- ppp(x = configuration$x[configuration$types == sp],
+          y = configuration$y[configuration$types == sp],
+          window = restricted_window)
+plot(ret)
+points(cc)
+auc(cc, ret)
+
+intensity_at_points <- as.function(ret)(cc$x, cc$y)
+residual <- density(cc, weights = 1 / intensity_at_points)
+range(residual)
+plot(residual)
+points(cc)
+```
+
+This indicates that the `NS` species is fitted decently well.
+
+## Clustering
+
 Let us see how well the model has performed on a specific species, say the water tupelo `NX`.
 We start with a basic inhomogeneous Poisson point process fit.
 
 ```{r}
-sp <- "NX"
+sp <- "NS"
 spatstat_ppp <- ppp(x = swamp$x[swamp$sp == sp],
                     y = swamp$y[swamp$sp == sp],
                     window = owin(c(0, 50), c(0, 200)))
@@ -254,7 +341,7 @@ The `ppjsdm` package is able to simulate one species conditional on the others, 
 To begin answering the question, let us draw one such sample of `NS`, and see how it compares to the actual distribution.
 
 ```{r}
-sp <- "NX"
+sp <- "NS"
 sp_index <- which(names(coef(fit)$beta0) == sp)
 only_species <- ppjsdm::Configuration(x = swamp$y[swamp$sp == sp], 
                                       y = swamp$x[swamp$sp == sp],
@@ -282,6 +369,15 @@ In the code below, we use the inhomogeneous $L$-function.
 
 ```{r}
 nsim <- 50
+sp <- "NS"
+sp_index <- which(names(coef(fit)$beta0) == sp)
+only_species <- ppjsdm::Configuration(x = swamp$y[swamp$sp == sp], 
+                                      y = swamp$x[swamp$sp == sp],
+                                      types = swamp$sp[swamp$sp == sp])
+everything_except_species <- ppjsdm::Configuration(x = swamp$y[swamp$sp != sp], 
+                                                   y = swamp$x[swamp$sp != sp],
+                                                   types = swamp$sp[swamp$sp != sp])
+
 samples <- lapply(seq_len(nsim), function(i) {
   ppjsdm::rgibbs(fit,
                  steps = 1e4,
@@ -303,3 +399,17 @@ abline(a = 0, b = 1, col = "blue")
 
 The results look much better!
 The model has properly modeled the conditional distribution of the water tupelo.
+
+```{r}
+intensities <- lapply(samples, function(sample) density(sample))
+conditional_intensity <- Reduce("+", intensities) / length(intensities)
+plot(conditional_intensity)
+points(only_species_ppp)
+auc(only_species_ppp, conditional_intensity)
+
+intensity_at_points <- as.function(conditional_intensity)(only_species_ppp$x, only_species_ppp$y)
+residual <- density(only_species_ppp, weights = 1 / intensity_at_points)
+range(residual)
+plot(residual)
+hist(residual)
+```

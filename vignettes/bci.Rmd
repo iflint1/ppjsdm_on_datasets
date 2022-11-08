@@ -87,6 +87,6 @@ fit <- ppjsdm::gibbsm(configuration,
 print(Sys.time() - tm)
 print(fit$coefficients)
 par(mar = c(5.1, 5.1, 4.1, 4.1))
-plot(fit$coefficients$alpha)
+plot(fit$coefficients$alpha[[1]])
 plot(fit$coefficients$gamma)
 ```

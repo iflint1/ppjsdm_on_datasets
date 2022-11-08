@@ -233,6 +233,78 @@ env <- envelope.ppp(ppp(configuration$x, configuration$y, window = spatstat_wind
 plot(env)
 ```
 
+# Using two short-range potentials
+
+In the latest version of `ppjsdm`, we can use multiple short-range potentials.
+Let us explore how that would work.
+
+```{r}
+saturation <- 10
+to_optimize <- function(df) {
+  lapply(seq_len(nrow(df)), function(i) {
+    set.seed(1)
+    fit <- ppjsdm::gibbsm(configuration, 
+                          window = window, 
+                          model = list(df$model[i], df$medium_range_model[i]),
+                          short_range = list(df$short_range[i], df$medium_range[i]),
+                          saturation = saturation,
+                          dummy_distribution = "stratified", 
+                          min_dummy = 1, dummy_factor = 1e10,
+                          max_dummy = 1e3, fitting_package = "glm")
+    list(aic = fit$aic, 
+         alpha1 = fit$coefficients$alpha[[1]], 
+         alpha2 = fit$coefficients$alpha[[2]])
+  })
+}
+possible_short_range <- seq(from = 0.1, to = 4, by = 0.1)
+possible_medium_range <- seq(from = 0.1, to = 4, by = 0.1)
+possible_model <- c("square_exponential", "exponential", "square_bump", "bump")
+possible_medium_range_model <- c("square_exponential", "exponential", "square_bump", "bump")
+df <- expand.grid(short_range = possible_short_range,
+                  medium_range = possible_medium_range, 
+                  model = possible_model,
+                  medium_range_model = possible_medium_range_model)
+df <- df[df$short_range <= df$medium_range, ]
+ret <- to_optimize(df)
+df$aic <- sapply(ret, function(r) r$aic)
+df$alpha1 <- sapply(ret, function(r) r$alpha1)
+df$alpha2 <- sapply(ret, function(r) r$alpha2)
+
+df <- df[order(df$aic), ]
+
+x <- seq(from = 0, to = 5, length.out = 1e3)
+g <- ggplot() + 
+  geom_line(aes(x = x, y = 0), colour = "red") +
+  theme_minimal()
+ntot <- 100
+
+for(i in seq_len(ntot)) {
+  short_range <- df[i, ]$short_range
+  medium_range <- df[i, ]$medium_range
+  potential <- function(model, r) {
+    if(model == "square_bump") {
+      function(x) 1 - exp(-r * r * log(2) / (x * x))
+    } else if(model == "square_exponential") {
+      function(x) exp(-x^2 * log(2) / (r * r))
+    } else if(model == "bump") {
+      function(x) 1 - exp(-r * log(2) / x)
+    } else if(model == "exponential") {
+      function(x) exp(-x * log(2) / r)
+    }
+  }
+  assign(paste0("dat", i), data.frame(x = x, 
+                                      short = df$alpha1[i] * potential(df[i, ]$model, r = short_range)(x),
+                                      medium = df$alpha2[i] * potential(df[i, ]$medium_range_model, r = medium_range)(x),
+                                      total = df$alpha1[i] * potential(df[i, ]$model, r = short_range)(x) + 
+                                        df$alpha2[i] * potential(df[i, ]$medium_range_model, r = medium_range)(x)))
+  g <- g +
+    geom_line(data = get(paste0("dat", i)), aes(x = x, y = total, colour = "Total"), alpha = 0.3) +
+    geom_line(data = get(paste0("dat", i)), aes(x = x, y = short, colour = "Short"), alpha = 0.2) +
+    geom_line(data = get(paste0("dat", i)), aes(x = x, y = medium, colour = "Medium"), alpha = 0.2)
+}
+g
+```
+
 <!-- # Comparison to classical Hard-core model. -->
 
 <!-- ```{r} -->
