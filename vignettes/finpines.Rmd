@@ -20,6 +20,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
+library(cowplot)
 library(ggplot2)
 library(ppjsdm)
 library(spatstat)
@@ -340,9 +341,19 @@ print(summary(fit))
 ```
 
 The model is predicting clustering at short ranges, but has not picked up on any significant interactions at medium ranges.
-To better understand the fit, there are two steps you usually do after running a fit.
+To better understand the fit, there are three steps you usually do after running a fit.
 
-First, let us have a look at the log-Papangelou conditional intensity.
+First, we can look at the overall fitted interaction potential.
+
+```{r}
+plot(potentials(fit, 
+                species1 = "Pine")) # This second argument is not required since there is only one species...
+```
+
+This plot allows us to visualise the interaction coefficients as well as the shape of the interaction potentials.
+The maxima of both bumps correspond to the fitted interaction coefficients.
+
+Second, let us have a look at the log-Papangelou conditional intensity.
 
 ```{r}
 plot_papangelou(fit,
@@ -352,7 +363,7 @@ plot_papangelou(fit,
 So, conditional on the existing locations, the model is predicting increased probabilities of finding new individuals around existing ones.
 This provides some insight what the model is capturing to be the underlying generative process.
 
-Second, we can draw a single realisation from the model.
+Third, we can draw a single realisation from the model.
 This is controlled by the parameter `steps` which is the number of steps in the Metropolis-Hastings algorithms.
 Setting `steps=0` causes the code to run a coupling from the past algorithm instead, this yields exact samples from the target distribution but whether or not it converges in a reasonable time depends on the model.
 In our case, unfortunately the large amonts of clustering cause the coupling from the past algorithm to not converge.
@@ -398,6 +409,24 @@ The empirical $K$ function $\widehat K_{obs}$ is the one computed from the data.
 The mean $K$ function $\bar K$ is the mean estimate obtained from 50 draws of our fitted model. 
 If the mean $K(r)$ function is above the empirical $K(r)$ function, our model is predicting more clustering than is present in the data, for those values of $r$, and vice versa.
 We find that our model reproduces well the actual observed $K$ function, indicating that the model is capturing spatial clustering well on all scales.
+
+Another nice application of simulation is a visual test.
+Let us simulate eight different draws from the fitted model, and plot them alongside the true data.
+
+```{r}
+draws <- lapply(1:8, function(i) {
+  draw <- ppjsdm::rgibbs(fit,
+                         steps = steps)
+  plot(draw, window = window)
+})
+draws[[length(draws) + 1]] <- plot(configuration, window = window)
+indices <- sample(1:length(draws))
+cowplot::plot_grid(plotlist = draws[indices])
+
+cat(paste0("Index of configuration: ", which(indices == length(indices))))
+```
+
+As long as the configuration of fin pines does not stand out among the simulated draws, we can reasonably claim that our model fits the data well.
 
 # Improving the fit
 
