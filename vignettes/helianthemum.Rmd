@@ -33,6 +33,8 @@ These are part of the data collected by Romao (2003) that have been analyzed sev
 The coordinates of the plans are given in cm.
 
 ```{r}
+data(Helianthemum)
+
 # Remove duplicate points
 df <- unique(data.frame(x = Helianthemum$x,
                         y = Helianthemum$y,
